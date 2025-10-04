@@ -9,19 +9,26 @@ import {
   Index,
 } from "typeorm";
 import { User } from "./user.entity";
+import { Turf } from "./turf.entity";
 
 export enum BookingStatus {
+  PENDING = "pending",
+  CONFIRMED = "confirmed",
   ACTIVE = "active",
   CANCELLED = "cancelled",
   COMPLETED = "completed",
 }
 
 @Entity("bookings")
-@Index(["date", "startTime", "endTime"])
+@Index(["turfId", "date", "startTime", "endTime"])
 @Index(["status", "date"])
+@Index(["userId"])
 export class Booking {
   @PrimaryGeneratedColumn("uuid")
   id: string;
+
+  @Column({ name: "turf_id", type: "uuid" })
+  turfId: string;
 
   @Column({ name: "user_id", type: "uuid" })
   userId: string;
@@ -41,7 +48,7 @@ export class Booking {
   @Column({
     type: "enum",
     enum: BookingStatus,
-    default: BookingStatus.ACTIVE,
+    default: BookingStatus.PENDING,
   })
   status: BookingStatus;
 
@@ -50,6 +57,9 @@ export class Booking {
 
   @Column({ name: "cancelled_at", type: "timestamp", nullable: true })
   cancelledAt: Date;
+
+  @Column({ name: "cancellation_reason", type: "text", nullable: true })
+  cancellationReason: string;
 
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
@@ -60,4 +70,8 @@ export class Booking {
   @ManyToOne(() => User, (user) => user.bookings, { eager: false })
   @JoinColumn({ name: "user_id" })
   user: User;
+
+  @ManyToOne(() => Turf, (turf) => turf.bookings, { eager: false })
+  @JoinColumn({ name: "turf_id" })
+  turf: Turf;
 }

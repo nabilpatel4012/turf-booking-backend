@@ -10,13 +10,18 @@ import {
 } from "typeorm";
 import { User } from "./user.entity";
 import { Booking } from "./booking.entity";
+import { Turf } from "./turf.entity";
 
 @Entity("reviews")
+@Index(["turfId"])
 @Index(["bookingId"])
 @Unique(["userId", "bookingId"])
 export class Review {
   @PrimaryGeneratedColumn("uuid")
   id: string;
+
+  @Column({ name: "turf_id", type: "uuid" })
+  turfId: string;
 
   @Column({ name: "user_id", type: "uuid" })
   userId: string;
@@ -36,6 +41,10 @@ export class Review {
   @ManyToOne(() => User, (user) => user.reviews, { eager: false })
   @JoinColumn({ name: "user_id" })
   user: User;
+
+  @ManyToOne(() => Turf, (turf) => turf.reviews, { eager: false })
+  @JoinColumn({ name: "turf_id" })
+  turf: Turf;
 
   @ManyToOne(() => Booking, { eager: false })
   @JoinColumn({ name: "booking_id" })

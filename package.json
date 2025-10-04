@@ -8,9 +8,9 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only server.ts",
     "typeorm": "typeorm-ts-node-commonjs",
-    "migration:generate": "npm run typeorm migration:generate -- -d src/db/data.source.ts",
-    "migration:run": "npm run typeorm migration:run -- -d src/db/data.source.ts",
-    "migration:revert": "npm run typeorm migration:revert -- -d src/db/data.source.ts"
+    "migration:generate": "npm run typeorm -- migration:generate -d src/db/data.source.ts",
+    "migration:run": "npm run typeorm -- migration:run -d src/db/data.source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/db/data.source.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

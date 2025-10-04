@@ -10,11 +10,6 @@ import { Booking } from "./booking.entity";
 import { Review } from "./review.entity";
 import "reflect-metadata";
 
-export enum UserRole {
-  USER = "user",
-  ADMIN = "admin",
-}
-
 @Entity("users")
 export class User {
   @PrimaryGeneratedColumn("uuid")
@@ -29,12 +24,11 @@ export class User {
   @Column({ type: "varchar" })
   name: string;
 
-  @Column({
-    type: "enum",
-    enum: UserRole,
-    default: UserRole.USER,
-  })
-  role: UserRole;
+  @Column({ type: "varchar", nullable: true })
+  phone: string;
+
+  @Column({ type: "boolean", default: true })
+  isActive: boolean;
 
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;

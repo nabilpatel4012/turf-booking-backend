@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { User } from "../entities/user.entity";
+import { Admin } from "../entities/admin.entity";
+import { Turf } from "../entities/turf.entity";
 import { Booking } from "../entities/booking.entity";
 import { Review } from "../entities/review.entity";
 import { Pricing } from "../entities/pricing.entity";
@@ -19,7 +21,18 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD || "npg_5FONCuivErp1",
   database: process.env.DB_NAME || "neondb",
   ssl: process.env.SSL !== "false",
-  entities: [User, Booking, Review, Pricing, Announcement, Setting],
+  entities: [
+    User,
+    Admin,
+    Turf,
+    Booking,
+    Review,
+    Pricing,
+    Announcement,
+    Setting,
+  ],
   synchronize: false, // Never use in production
   logging: process.env.NODE_ENV === "development",
+  migrations: ["src/migrations/**/*.ts"],
+  migrationsTableName: "migrations",
 });

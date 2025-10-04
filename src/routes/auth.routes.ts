@@ -4,24 +4,57 @@ import { asyncHandler } from "../middleware/error.middleware";
 import {
   validateRegister,
   validateLogin,
+  validatePasswordChange,
 } from "../middleware/validation.middleware";
-import { restrictToIP } from "../middleware/auth.middleware";
+import {
+  restrictToIP,
+  authenticateUser,
+  authenticateAdmin,
+} from "../middleware/auth.middleware";
 
 const router = Router();
 const authController = new AuthController();
 const adminIP = process.env.ADMIN_IP || "65.0.11.156";
 
+// User Routes
 router.post(
-  "/register",
+  "/user/register",
   validateRegister,
-  asyncHandler(authController.register)
+  asyncHandler(authController.registerUser)
 );
-router.post("/login", validateLogin, asyncHandler(authController.login));
+
 router.post(
-  "/create-admin",
+  "/user/login",
+  validateLogin,
+  asyncHandler(authController.loginUser)
+);
+
+router.post(
+  "/user/change-password",
+  authenticateUser,
+  validatePasswordChange,
+  asyncHandler(authController.changeUserPassword)
+);
+
+// Admin Routes
+router.post(
+  "/admin/register",
   restrictToIP(adminIP),
   validateRegister,
-  asyncHandler(authController.createAdmin)
+  asyncHandler(authController.registerAdmin)
+);
+
+router.post(
+  "/admin/login",
+  validateLogin,
+  asyncHandler(authController.loginAdmin)
+);
+
+router.post(
+  "/admin/change-password",
+  authenticateAdmin,
+  validatePasswordChange,
+  asyncHandler(authController.changeAdminPassword)
 );
 
 export default router;

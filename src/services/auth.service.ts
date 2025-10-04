@@ -1,26 +1,40 @@
 import { Repository } from "typeorm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { User, UserRole } from "../entities/user.entity";
+import { User } from "../entities/user.entity";
+import { Admin } from "../entities/admin.entity";
 import { AppDataSource } from "../db/data.source";
+
+export enum AuthRole {
+  USER = "user",
+  ADMIN = "admin",
+}
+
+interface TokenPayload {
+  id: string;
+  role: AuthRole;
+}
 
 export class AuthService {
   private userRepository: Repository<User>;
+  private adminRepository: Repository<Admin>;
   private readonly jwtSecret: string;
   private readonly bcryptRounds: number;
 
   constructor() {
     this.userRepository = AppDataSource.getRepository(User);
+    this.adminRepository = AppDataSource.getRepository(Admin);
     this.jwtSecret =
       process.env.JWT_SECRET || "your-secret-key-change-in-production";
     this.bcryptRounds = 10;
   }
 
-  async register(
+  // User Registration
+  async registerUser(
     email: string,
     password: string,
     name: string,
-    role: UserRole = UserRole.USER
+    phone?: string
   ) {
     const existingUser = await this.userRepository.findOne({
       where: { email },
@@ -36,12 +50,12 @@ export class AuthService {
       email,
       password: hashedPassword,
       name,
-      role,
+      phone,
     });
 
     await this.userRepository.save(user);
 
-    const token = this.generateToken(user);
+    const token = this.generateToken(user.id, AuthRole.USER);
 
     return {
       token,
@@ -49,21 +63,26 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        phone: user.phone,
+        role: AuthRole.USER,
       },
     };
   }
 
-  async login(email: string, password: string) {
-    // Use createQueryBuilder with addSelect to explicitly include password
+  // User Login
+  async loginUser(email: string, password: string) {
     const user = await this.userRepository
       .createQueryBuilder("user")
       .where("user.email = :email", { email })
-      .addSelect("user.password") // Explicitly select password field
+      .addSelect("user.password")
       .getOne();
 
     if (!user) {
       throw new Error("Invalid credentials");
+    }
+
+    if (!user.isActive) {
+      throw new Error("Account is deactivated. Please contact support.");
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
@@ -72,7 +91,7 @@ export class AuthService {
       throw new Error("Invalid credentials");
     }
 
-    const token = this.generateToken(user);
+    const token = this.generateToken(user.id, AuthRole.USER);
 
     return {
       token,
@@ -80,27 +99,104 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        phone: user.phone,
+        role: AuthRole.USER,
       },
     };
   }
 
-  private generateToken(user: User): string {
-    return jwt.sign({ id: user.id, role: user.role }, this.jwtSecret, {
+  // Admin Registration
+  async registerAdmin(
+    email: string,
+    password: string,
+    name: string,
+    phone?: string
+  ) {
+    const existingAdmin = await this.adminRepository.findOne({
+      where: { email },
+    });
+
+    if (existingAdmin) {
+      throw new Error("Admin already exists");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, this.bcryptRounds);
+
+    const admin = this.adminRepository.create({
+      email,
+      password: hashedPassword,
+      name,
+      phone,
+    });
+
+    await this.adminRepository.save(admin);
+
+    const token = this.generateToken(admin.id, AuthRole.ADMIN);
+
+    return {
+      token,
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        phone: admin.phone,
+        role: AuthRole.ADMIN,
+      },
+    };
+  }
+
+  // Admin Login
+  async loginAdmin(email: string, password: string) {
+    const admin = await this.adminRepository
+      .createQueryBuilder("admin")
+      .where("admin.email = :email", { email })
+      .addSelect("admin.password")
+      .getOne();
+
+    if (!admin) {
+      throw new Error("Invalid credentials");
+    }
+
+    if (!admin.isActive) {
+      throw new Error("Account is deactivated. Please contact support.");
+    }
+
+    const isValidPassword = await bcrypt.compare(password, admin.password);
+
+    if (!isValidPassword) {
+      throw new Error("Invalid credentials");
+    }
+
+    const token = this.generateToken(admin.id, AuthRole.ADMIN);
+
+    return {
+      token,
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        phone: admin.phone,
+        role: AuthRole.ADMIN,
+      },
+    };
+  }
+
+  private generateToken(id: string, role: AuthRole): string {
+    return jwt.sign({ id, role }, this.jwtSecret, {
       expiresIn: "7d",
     });
   }
 
-  verifyToken(token: string): { id: string; role: UserRole } {
-    return jwt.verify(token, this.jwtSecret) as { id: string; role: UserRole };
+  verifyToken(token: string): TokenPayload {
+    return jwt.verify(token, this.jwtSecret) as TokenPayload;
   }
 
-  async changePassword(
+  // User Password Change
+  async changeUserPassword(
     userId: string,
     oldPassword: string,
     newPassword: string
   ) {
-    // Fetch user with password for verification
     const user = await this.userRepository
       .createQueryBuilder("user")
       .where("user.id = :userId", { userId })
@@ -111,14 +207,12 @@ export class AuthService {
       throw new Error("User not found");
     }
 
-    // Verify old password
     const isValidPassword = await bcrypt.compare(oldPassword, user.password);
 
     if (!isValidPassword) {
       throw new Error("Current password is incorrect");
     }
 
-    // Hash and update new password
     const hashedPassword = await bcrypt.hash(newPassword, this.bcryptRounds);
     user.password = hashedPassword;
 
@@ -127,11 +221,40 @@ export class AuthService {
     return { message: "Password changed successfully" };
   }
 
-  async resetPassword(userId: string, newPassword: string) {
-    // Hash new password
+  // Admin Password Change
+  async changeAdminPassword(
+    adminId: string,
+    oldPassword: string,
+    newPassword: string
+  ) {
+    const admin = await this.adminRepository
+      .createQueryBuilder("admin")
+      .where("admin.id = :adminId", { adminId })
+      .addSelect("admin.password")
+      .getOne();
+
+    if (!admin) {
+      throw new Error("Admin not found");
+    }
+
+    const isValidPassword = await bcrypt.compare(oldPassword, admin.password);
+
+    if (!isValidPassword) {
+      throw new Error("Current password is incorrect");
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptRounds);
+    admin.password = hashedPassword;
+
+    await this.adminRepository.save(admin);
+
+    return { message: "Password changed successfully" };
+  }
+
+  // User Password Reset
+  async resetUserPassword(userId: string, newPassword: string) {
     const hashedPassword = await bcrypt.hash(newPassword, this.bcryptRounds);
 
-    // Update password directly without fetching
     const result = await this.userRepository.update(
       { id: userId },
       { password: hashedPassword }
@@ -139,6 +262,22 @@ export class AuthService {
 
     if (result.affected === 0) {
       throw new Error("User not found");
+    }
+
+    return { message: "Password reset successfully" };
+  }
+
+  // Admin Password Reset
+  async resetAdminPassword(adminId: string, newPassword: string) {
+    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptRounds);
+
+    const result = await this.adminRepository.update(
+      { id: adminId },
+      { password: hashedPassword }
+    );
+
+    if (result.affected === 0) {
+      throw new Error("Admin not found");
     }
 
     return { message: "Password reset successfully" };
