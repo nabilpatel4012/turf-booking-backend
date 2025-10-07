@@ -1,5 +1,5 @@
 import { Repository } from "typeorm";
-import { User, UserRole } from "../entities/user.entity";
+import { User } from "../entities/user.entity";
 import { Booking, BookingStatus } from "../entities/booking.entity";
 import { Review } from "../entities/review.entity";
 import { AppDataSource } from "../db/data.source";
@@ -16,11 +16,9 @@ export class StatsService {
   private reviewRepository: Repository<Review>;
   private bookingService: BookingService;
 
-  // Cache for expensive operations (5 minutes TTL)
   private cache: Map<string, CachedStats> = new Map();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly CACHE_TTL = 5 * 60 * 1000;
 
-  // Request queue to prevent duplicate concurrent requests
   private pendingRequests: Map<string, Promise<any>> = new Map();
 
   constructor() {
@@ -30,21 +28,33 @@ export class StatsService {
     this.bookingService = new BookingService();
   }
 
-  async getAdvancedAdminStats(useCache: boolean = true) {
-    const cacheKey = "advanced_admin_stats";
+  /**
+   * Creates a base query for bookings that is pre-filtered for a specific admin's turfs.
+   * @param adminId The ID of the admin (owner).
+   * @returns A TypeORM QueryBuilder instance.
+   */
+  private createAdminFilteredBookingQuery(adminId: string) {
+    return this.bookingRepository
+      .createQueryBuilder("booking")
+      .leftJoin("booking.turf", "turf")
+      .where("turf.ownerId = :adminId", { adminId });
+  }
 
-    // Return cached data if valid
+  async getAdvancedAdminStats(adminId: string, useCache: boolean = true) {
+    // Make the cache key specific to the admin to prevent data leakage
+    const cacheKey = `advanced_admin_stats_${adminId}`;
+
     if (useCache) {
       const cached = this.getFromCache(cacheKey);
       if (cached) return cached;
     }
 
-    // Prevent duplicate concurrent requests
     if (this.pendingRequests.has(cacheKey)) {
       return this.pendingRequests.get(cacheKey);
     }
 
-    const promise = this.computeAdvancedStats();
+    // Pass adminId to the computation logic
+    const promise = this.computeAdvancedStats(adminId);
     this.pendingRequests.set(cacheKey, promise);
 
     try {
@@ -56,25 +66,22 @@ export class StatsService {
     }
   }
 
-  private async computeAdvancedStats() {
+  private async computeAdvancedStats(adminId: string) {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     const currentDay = now.getDate();
 
-    // --- Optimize: Use single queries with aggregation where possible ---
+    // Pass adminId to all underlying methods
+    const overviewPromise = this.getOptimizedOverview(adminId);
 
-    // Basic overview - optimized with single query
-    const overviewPromise = this.getOptimizedOverview();
-
-    // --- Previous 7 Days (including today) ---
     const last7DaysData = this.generateDateRange(now, 7, "days");
     const last7DaysPromise = this.getBatchEarnings(
+      adminId,
       last7DaysData.ranges,
       last7DaysData.labels
     );
 
-    // --- Days in Current Week ---
     const currentDayOfWeek = now.getDay();
     const startOfWeek = new Date(now);
     startOfWeek.setDate(currentDay - currentDayOfWeek);
@@ -85,42 +92,41 @@ export class StatsService {
       currentDayOfWeek
     );
     const currentWeekPromise = this.getBatchEarnings(
+      adminId,
       currentWeekData.ranges,
       currentWeekData.labels
     );
 
-    // --- Previous 4 Weeks + Current Week (5 total) ---
     const last5WeeksData = this.generate5WeeksRange(now, currentDayOfWeek);
     const last5WeeksPromise = this.getBatchEarnings(
+      adminId,
       last5WeeksData.ranges,
       last5WeeksData.labels
     );
 
-    // --- This Month: Weekly Breakdown ---
     const monthWeeksData = this.generateMonthWeeksRange(
       currentYear,
       currentMonth,
       now
     );
     const monthWeeksPromise = this.getBatchEarnings(
+      adminId,
       monthWeeksData.ranges,
       monthWeeksData.labels
     );
 
-    // --- This Year: Monthly Breakdown ---
     const yearMonthsData = this.generateYearMonthsRange(
       currentYear,
       currentMonth
     );
     const yearMonthsPromise = this.getBatchEarnings(
+      adminId,
       yearMonthsData.ranges,
       yearMonthsData.labels
     );
 
-    // --- Additional Stats (optimized with single queries) ---
-    const insightsPromise = this.getOptimizedInsights();
+    const insightsPromise = this.getOptimizedInsights(adminId);
 
-    // --- Execute all promises concurrently with proper error handling ---
     const [
       overview,
       last7Days,
@@ -139,7 +145,6 @@ export class StatsService {
       insightsPromise,
     ]);
 
-    // Extract results with fallbacks
     const getResult = (result: PromiseSettledResult<any>, fallback: any = {}) =>
       result.status === "fulfilled" ? result.value : fallback;
 
@@ -180,68 +185,97 @@ export class StatsService {
     };
   }
 
-  // --- Optimized Overview: Single aggregation query ---
-  private async getOptimizedOverview() {
-    const [bookingStats, userStats, reviewStats] = await Promise.all([
-      // Single query for all booking stats
-      this.bookingRepository
-        .createQueryBuilder("booking")
-        .select("booking.status", "status")
-        .addSelect("COUNT(*)", "count")
-        .addSelect(
-          "COALESCE(SUM(CASE WHEN booking.createdAt >= NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END), 0)",
-          "recent"
-        )
-        .groupBy("booking.status")
-        .getRawMany(),
+  private async getOptimizedOverview(adminId: string) {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      // User counts
-      this.userRepository
-        .createQueryBuilder("user")
-        .select("COUNT(*)", "total")
-        .addSelect(
-          "COALESCE(SUM(CASE WHEN user.createdAt >= NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END), 0)",
-          "recent"
-        )
-        .where("user.role = :role", { role: UserRole.USER })
-        .getRawOne(),
+      const [bookingStats, recentBookingsCount, userStats, reviewStats] =
+        await Promise.all([
+          this.createAdminFilteredBookingQuery(adminId)
+            .select("booking.status", "status")
+            .addSelect("COUNT(*)", "count")
+            .groupBy("booking.status")
+            .getRawMany(),
 
-      // Review stats
-      this.reviewRepository
-        .createQueryBuilder("review")
-        .select("COUNT(*)", "total")
-        .addSelect("AVG(review.rating)", "avgRating")
-        .getRawOne(),
-    ]);
+          this.createAdminFilteredBookingQuery(adminId)
+            .andWhere("booking.createdAt >= :thirtyDaysAgo", { thirtyDaysAgo })
+            .getCount(),
 
-    // Parse booking stats
-    const statusCounts = bookingStats.reduce((acc, row) => {
-      acc[row.status] = parseInt(row.count);
-      return acc;
-    }, {} as Record<string, number>);
+          this.createAdminFilteredBookingQuery(adminId)
+            .select("COUNT(DISTINCT booking.userId)", "total")
+            .addSelect(
+              "COUNT(DISTINCT CASE WHEN booking.createdAt >= :thirtyDaysAgo THEN booking.userId ELSE NULL END)",
+              "recent"
+            )
+            .setParameters({ thirtyDaysAgo })
+            .getRawOne(),
 
-    const totalBookings = Object.values(statusCounts).reduce(
-      (sum, count) => sum + count,
-      0
-    );
+          this.reviewRepository
+            .createQueryBuilder("review")
+            .leftJoin("review.booking", "booking")
+            .leftJoin("booking.turf", "turf")
+            .select("COUNT(review.id)", "total")
+            .addSelect("AVG(review.rating)", "avgRating")
+            .where("turf.ownerId = :adminId", { adminId })
+            .getRawOne(),
+        ]);
 
-    return {
-      activeBookings: statusCounts[BookingStatus.ACTIVE] || 0,
-      completedBookings: statusCounts[BookingStatus.COMPLETED] || 0,
-      cancelledBookings: statusCounts[BookingStatus.CANCELLED] || 0,
-      totalBookings,
-      totalUsers: parseInt(userStats?.total || "0"),
-      recentUsers: parseInt(userStats?.recent || "0"),
-      totalReviews: parseInt(reviewStats?.total || "0"),
-      averageRating: reviewStats?.avgRating
-        ? Number(parseFloat(reviewStats.avgRating).toFixed(2))
-        : 0,
-      bookingsByStatus: statusCounts,
-    };
+      const statusCounts: Record<string, number> = {};
+      bookingStats.forEach((row) => {
+        statusCounts[row.status.toLowerCase()] = parseInt(row.count || "0");
+      });
+
+      const totalBookings = Object.values(statusCounts).reduce(
+        (sum, count) => sum + count,
+        0
+      );
+      const getStatusCount = (status: string) =>
+        statusCounts[status.toLowerCase()] || 0;
+
+      return {
+        activeBookings: getStatusCount(BookingStatus.ACTIVE),
+        completedBookings: getStatusCount(BookingStatus.COMPLETED),
+        cancelledBookings: getStatusCount(BookingStatus.CANCELLED),
+        totalBookings,
+        totalUsers: parseInt(userStats?.total || "0"),
+        recentUsers: parseInt(userStats?.recent || "0"),
+        totalReviews: parseInt(reviewStats?.total || "0"),
+        averageRating: reviewStats?.avgRating
+          ? Number(parseFloat(reviewStats.avgRating).toFixed(2))
+          : 0,
+        bookingsByStatus: {
+          active: getStatusCount(BookingStatus.ACTIVE),
+          completed: getStatusCount(BookingStatus.COMPLETED),
+          cancelled: getStatusCount(BookingStatus.CANCELLED),
+          pending: getStatusCount(BookingStatus.PENDING),
+          confirmed: getStatusCount(BookingStatus.CONFIRMED),
+        },
+      };
+    } catch (error) {
+      console.error("Error in getOptimizedOverview:", error);
+      return {
+        activeBookings: 0,
+        completedBookings: 0,
+        cancelledBookings: 0,
+        totalBookings: 0,
+        totalUsers: 0,
+        recentUsers: 0,
+        totalReviews: 0,
+        averageRating: 0,
+        bookingsByStatus: {
+          active: 0,
+          completed: 0,
+          cancelled: 0,
+          pending: 0,
+          confirmed: 0,
+        },
+      };
+    }
   }
 
-  // --- Optimized: Batch earnings calculation with single query ---
   private async getBatchEarnings(
+    adminId: string,
     ranges: Array<{ start: Date; end: Date }>,
     labels: string[]
   ) {
@@ -249,12 +283,12 @@ export class StatsService {
       return { breakdown: [], totalEarnings: 0 };
     }
 
-    // Build a single query with CASE statements for all ranges
-    let query = this.bookingRepository
-      .createQueryBuilder("booking")
-      .where("booking.status != :cancelled", {
+    let query = this.createAdminFilteredBookingQuery(adminId).andWhere(
+      "booking.status != :cancelled",
+      {
         cancelled: BookingStatus.CANCELLED,
-      });
+      }
+    );
 
     const selectCases = ranges.map(
       (range, idx) =>
@@ -263,7 +297,6 @@ export class StatsService {
 
     query = query.select(selectCases);
 
-    // Add parameters for all ranges
     ranges.forEach((range, idx) => {
       query.setParameter(`start${idx}`, range.start);
       query.setParameter(`end${idx}`, range.end);
@@ -280,16 +313,12 @@ export class StatsService {
       (sum, item) => sum + item.earnings,
       0
     );
-
     return { breakdown, totalEarnings };
   }
 
-  // --- Optimized Insights: Combined queries ---
-  private async getOptimizedInsights() {
+  private async getOptimizedInsights(adminId: string) {
     const [durationAndHours, topUsers] = await Promise.all([
-      // Combined query for duration and peak hours
-      this.bookingRepository
-        .createQueryBuilder("booking")
+      this.createAdminFilteredBookingQuery(adminId)
         .select(
           "AVG(EXTRACT(EPOCH FROM (booking.endTime - booking.startTime)) / 3600)",
           "avgDuration"
@@ -299,15 +328,13 @@ export class StatsService {
         .groupBy("hour")
         .getRawMany(),
 
-      // Top users
-      this.bookingRepository
-        .createQueryBuilder("booking")
+      this.createAdminFilteredBookingQuery(adminId)
         .leftJoin("booking.user", "user")
         .select("booking.userId", "userId")
         .addSelect("user.email", "email")
         .addSelect("COUNT(*)", "bookingCount")
         .addSelect("SUM(booking.price)", "totalSpent")
-        .where("booking.status != :cancelled", {
+        .andWhere("booking.status != :cancelled", {
           cancelled: BookingStatus.CANCELLED,
         })
         .groupBy("booking.userId")
@@ -317,13 +344,10 @@ export class StatsService {
         .getRawMany(),
     ]);
 
-    // Calculate average duration from first row
     const avgDuration =
       durationAndHours.length > 0 && durationAndHours[0].avgDuration
         ? parseFloat(Number(durationAndHours[0].avgDuration).toFixed(2))
         : 0;
-
-    // Extract peak hours and sort by count
     const peakBookingHours = durationAndHours
       .filter((row) => row.hour !== null)
       .map((row) => ({
@@ -332,7 +356,6 @@ export class StatsService {
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-
     const topUsersData = topUsers.map((r) => ({
       userId: r.userId,
       email: r.email,
@@ -552,13 +575,13 @@ export class StatsService {
       monthlyEarnings,
       totalUsers,
       totalBookings,
-      cancelledBookings,
+      // cancelledBookings,
     ] = await Promise.all([
       this.bookingService.getActiveBookingsCount(),
       this.bookingService.getTotalEarnings(today, endOfDay),
       this.bookingService.getTotalEarnings(weekAgo, now),
       this.bookingService.getTotalEarnings(monthAgo, now),
-      this.userRepository.count({ where: { role: UserRole.USER } }),
+      // this.userRepository.count({ where: { role: UserRole.USER } }),
       this.bookingRepository.count(),
       this.bookingService.getCancelledBookingsCount(),
     ]);
@@ -570,7 +593,7 @@ export class StatsService {
       monthlyEarnings,
       totalUsers,
       totalBookings,
-      cancelledBookings,
+      // cancelledBookings,
     };
   }
 }

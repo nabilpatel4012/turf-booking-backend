@@ -14,6 +14,7 @@ export enum AnnouncementType {
   MAINTENANCE = "maintenance",
   PROMOTION = "promotion",
   CLOSURE = "closure",
+  TOURNAMENT = "tournament",
 }
 
 @Entity("announcements")

@@ -10,7 +10,15 @@ export class StatsController {
   }
 
   getAdminStats = async (req: AuthRequest, res: Response) => {
-    const stats = await this.statsService.getAdvancedAdminStats();
-    res.json(stats);
+    if (req.user && req.user?.role === "admin") {
+      const adminId = req.user.id;
+      const stats = await this.statsService.getAdvancedAdminStats(
+        adminId,
+        true
+      );
+      res.json(stats);
+    } else {
+      res.json({ error: "You don't have access to this service" }).status(403);
+    }
   };
 }

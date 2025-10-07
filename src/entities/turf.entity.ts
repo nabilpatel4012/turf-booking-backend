@@ -39,10 +39,10 @@ export class Turf {
   @Column({ type: "varchar" })
   address: string;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "varchar" })
   city: string;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "varchar" })
   state: string;
 
   @Column({ type: "varchar", nullable: true })
@@ -54,7 +54,7 @@ export class Turf {
   @Column({ type: "decimal", precision: 11, scale: 8, nullable: true })
   longitude: number;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "varchar" })
   phone: string;
 
   @Column({ type: "simple-array", nullable: true })
@@ -70,10 +70,10 @@ export class Turf {
   })
   status: TurfStatus;
 
-  @Column({ name: "opening_time", type: "time", default: "06:00:00" })
+  @Column({ name: "opening_time", type: "time", default: "00:00:00" })
   openingTime: string;
 
-  @Column({ name: "closing_time", type: "time", default: "23:00:00" })
+  @Column({ name: "closing_time", type: "time", default: "23:59:59" })
   closingTime: string;
 
   @CreateDateColumn({ name: "created_at" })

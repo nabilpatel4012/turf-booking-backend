@@ -52,7 +52,7 @@ export class Booking {
   })
   status: BookingStatus;
 
-  @Column({ name: "created_by", type: "uuid", nullable: true })
+  @Column({ name: "created_by", type: "text", nullable: true })
   createdBy: string;
 
   @Column({ name: "cancelled_at", type: "timestamp", nullable: true })

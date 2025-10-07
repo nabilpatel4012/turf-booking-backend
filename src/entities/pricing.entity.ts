@@ -45,7 +45,15 @@ export class Pricing {
   })
   timeSlot: TimeSlot;
 
-  @Column({ type: "decimal", precision: 10, scale: 2 })
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    transformer: {
+      to: (value: number) => value, // store as-is
+      from: (value: string) => parseFloat(value), // retrieve as number
+    },
+  })
   price: number;
 
   @UpdateDateColumn({ name: "updated_at" })

@@ -1,6 +1,8 @@
 import { Repository } from "typeorm";
 import { Pricing, DayType, TimeSlot } from "../entities/pricing.entity";
+import { Turf } from "../entities/turf.entity";
 import { AppDataSource } from "../db/data.source";
+import { AppError } from "../middleware/error.middleware";
 
 interface PricingUpdate {
   weekday?: { [key: string]: number };
@@ -9,15 +11,18 @@ interface PricingUpdate {
 
 export class PricingService {
   private pricingRepository: Repository<Pricing>;
-  private pricingCache: Map<string, number> = new Map();
-  private cacheExpiry: number = 0;
+  private turfRepository: Repository<Turf>;
+  private pricingCache: Map<string, { price: number; expiry: number }> =
+    new Map();
   private readonly cacheDuration = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
     this.pricingRepository = AppDataSource.getRepository(Pricing);
+    this.turfRepository = AppDataSource.getRepository(Turf);
   }
 
   async calculatePrice(
+    turfId: string,
     startTime: Date,
     endTime: Date,
     date: string
@@ -37,50 +42,59 @@ export class PricingService {
       timeSlot = TimeSlot.AFTERNOON;
     }
 
-    const pricePerHour = await this.getPriceFromCache(dayType, timeSlot);
+    const pricePerHour = await this.getPriceFromCache(
+      turfId,
+      dayType,
+      timeSlot
+    );
     return pricePerHour * hours;
   }
 
   private async getPriceFromCache(
+    turfId: string,
     dayType: DayType,
     timeSlot: TimeSlot
   ): Promise<number> {
     const now = Date.now();
-    const cacheKey = `${dayType}_${timeSlot}`;
+    const cacheKey = `${turfId}_${dayType}_${timeSlot}`;
 
-    if (now < this.cacheExpiry && this.pricingCache.has(cacheKey)) {
-      return this.pricingCache.get(cacheKey)!;
+    const cached = this.pricingCache.get(cacheKey);
+    if (cached && now < cached.expiry) {
+      return cached.price;
     }
 
-    // Refresh cache
-    if (now >= this.cacheExpiry) {
-      await this.refreshCache();
+    // Fetch from database
+    const pricing = await this.pricingRepository.findOne({
+      where: { turfId, dayType, timeSlot },
+    });
+
+    if (!pricing) {
+      throw new AppError(
+        `Pricing not configured for this turf (${dayType} ${timeSlot})`,
+        404
+      );
     }
 
-    const price = this.pricingCache.get(cacheKey);
-    if (!price) {
-      throw new Error(`Price not found for ${dayType} ${timeSlot}`);
-    }
+    const price = parseFloat(pricing.price.toString());
+
+    // Cache the price
+    this.pricingCache.set(cacheKey, {
+      price,
+      expiry: now + this.cacheDuration,
+    });
 
     return price;
   }
 
-  private async refreshCache() {
-    const allPricing = await this.pricingRepository.find();
-
-    this.pricingCache.clear();
-    allPricing.forEach((pricing) => {
-      const key = `${pricing.dayType}_${pricing.timeSlot}`;
-      this.pricingCache.set(key, parseFloat(pricing.price.toString()));
-    });
-
-    this.cacheExpiry = Date.now() + this.cacheDuration;
-  }
-
-  async getAllPricing() {
+  async getAllPricing(turfId: string) {
     const pricing = await this.pricingRepository.find({
+      where: { turfId },
       order: { dayType: "ASC", timeSlot: "ASC" },
     });
+
+    if (pricing.length === 0) {
+      throw new AppError("Pricing not configured for this turf", 404);
+    }
 
     const formatted: any = { weekday: {}, weekend: {} };
     pricing.forEach((p) => {
@@ -90,7 +104,16 @@ export class PricingService {
     return formatted;
   }
 
-  async updatePricing(updates: PricingUpdate) {
+  async updatePricing(turfId: string, ownerId: string, updates: PricingUpdate) {
+    // Verify ownership
+    const turf = await this.turfRepository.findOne({
+      where: { id: turfId, ownerId },
+    });
+
+    if (!turf) {
+      throw new AppError("Turf not found or unauthorized", 404);
+    }
+
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -98,27 +121,90 @@ export class PricingService {
     try {
       for (const [dayType, slots] of Object.entries(updates)) {
         if (slots) {
-          for (const [timeSlot, price] of Object.entries(slots)) {
-            await queryRunner.manager.update(
-              Pricing,
-              { dayType: dayType as DayType, timeSlot: timeSlot as TimeSlot },
-              { price }
-            );
+          for (const [timeSlot, rawPrice] of Object.entries(slots)) {
+            const price = Number(rawPrice); // safely cast
+            if (isNaN(price)) continue; // skip invalid
+
+            const existing = await queryRunner.manager.findOne(Pricing, {
+              where: {
+                turfId,
+                dayType: dayType as DayType,
+                timeSlot: timeSlot as TimeSlot,
+              },
+            });
+
+            if (existing) {
+              await queryRunner.manager.update(
+                Pricing,
+                {
+                  turfId,
+                  dayType: dayType as DayType,
+                  timeSlot: timeSlot as TimeSlot,
+                },
+                { price }
+              );
+            } else {
+              const newPricing = queryRunner.manager.create(Pricing, {
+                turfId,
+                dayType: dayType as DayType,
+                timeSlot: timeSlot as TimeSlot,
+                price,
+              });
+              await queryRunner.manager.save(newPricing);
+            }
           }
         }
       }
 
       await queryRunner.commitTransaction();
 
-      // Invalidate cache
-      this.cacheExpiry = 0;
+      // Invalidate cache for this turf
+      this.invalidateCacheForTurf(turfId);
 
-      return await this.getAllPricing();
+      return await this.getAllPricing(turfId);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async createDefaultPricing(turfId: string) {
+    const defaultPricing = [
+      // Weekday pricing
+      { dayType: DayType.WEEKDAY, timeSlot: TimeSlot.MORNING, price: 500 },
+      { dayType: DayType.WEEKDAY, timeSlot: TimeSlot.AFTERNOON, price: 700 },
+      { dayType: DayType.WEEKDAY, timeSlot: TimeSlot.EVENING, price: 1000 },
+      // Weekend pricing
+      { dayType: DayType.WEEKEND, timeSlot: TimeSlot.MORNING, price: 700 },
+      { dayType: DayType.WEEKEND, timeSlot: TimeSlot.AFTERNOON, price: 1000 },
+      { dayType: DayType.WEEKEND, timeSlot: TimeSlot.EVENING, price: 1500 },
+    ];
+
+    const pricingEntities = defaultPricing.map((p) =>
+      this.pricingRepository.create({ ...p, turfId })
+    );
+
+    await this.pricingRepository.save(pricingEntities);
+
+    return await this.getAllPricing(turfId);
+  }
+
+  async deletePricingForTurf(turfId: string) {
+    await this.pricingRepository.delete({ turfId });
+    this.invalidateCacheForTurf(turfId);
+  }
+
+  private invalidateCacheForTurf(turfId: string) {
+    const keysToDelete: string[] = [];
+
+    this.pricingCache.forEach((_, key) => {
+      if (key.startsWith(`${turfId}_`)) {
+        keysToDelete.push(key);
+      }
+    });
+
+    keysToDelete.forEach((key) => this.pricingCache.delete(key));
   }
 }
