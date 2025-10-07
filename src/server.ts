@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import app from "./app";
-import { AppDataSource } from "./src/db/data.source";
+import { AppDataSource } from "./db/data.source";
 
 const PORT = process.env.PORT || 3001;
 

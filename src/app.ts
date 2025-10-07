@@ -1,14 +1,14 @@
 import express from "express";
 import cors from "cors"; // 1. Import the cors middleware
-import authRoutes from "./src/routes/auth.routes";
-import bookingRoutes from "./src/routes/booking.routes";
-import turfRoutes from "./src/routes/turf.routes";
-import reviewRoutes from "./src/routes/review.routes";
-import pricingRoutes from "./src/routes/pricing.routes";
-import settingRoutes from "./src/routes/setting.routes";
-import adminRoutes from "./src/routes/admin.routes";
-import publicRoutes from "./src/routes/public.routes";
-import { errorHandler } from "./src/middleware/error.middleware";
+import authRoutes from "./routes/auth.routes";
+import bookingRoutes from "./routes/booking.routes";
+import turfRoutes from "./routes/turf.routes";
+import reviewRoutes from "./routes/review.routes";
+import pricingRoutes from "./routes/pricing.routes";
+import settingRoutes from "./routes/setting.routes";
+import adminRoutes from "./routes/admin.routes";
+import publicRoutes from "./routes/public.routes";
+import { errorHandler } from "./middleware/error.middleware";
 import "reflect-metadata";
 
 const app = express();
