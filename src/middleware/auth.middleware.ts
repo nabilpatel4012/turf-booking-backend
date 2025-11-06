@@ -5,31 +5,37 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     role: AuthRole;
+    sessionId?: string;
   };
 }
 
 const authService = new AuthService();
 
-// Base authentication - extracts and verifies token
+// Base authentication - extracts and verifies token from cookie
 export const authenticate = (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const authHeader = req.headers.authorization;
+    // Try to get token from cookie first, then fall back to Authorization header
+    let token = req.cookies?.accessToken;
 
-    if (!authHeader?.startsWith("Bearer ")) {
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+      }
+    }
+
+    if (!token) {
       return res.status(401).json({ error: "No token provided" });
     }
 
-    const token = authHeader.split(" ")[1];
-    if (token) {
-      req.user = authService.verifyToken(token);
-    }
+    req.user = authService.verifyToken(token);
     next();
   } catch (error) {
-    res.status(401).json({ error: "Invalid token" });
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 };
 
@@ -40,13 +46,20 @@ export const authenticateUser = (
   next: NextFunction
 ) => {
   try {
-    const authHeader = req.headers.authorization;
+    // Try to get token from cookie first, then fall back to Authorization header
+    let token = req.cookies?.accessToken;
 
-    if (!authHeader?.startsWith("Bearer ")) {
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+      }
+    }
+
+    if (!token) {
       return res.status(401).json({ error: "No token provided" });
     }
 
-    const token = authHeader.split(" ")[1];
     const decoded = authService.verifyToken(token);
 
     if (decoded.role !== AuthRole.USER) {
@@ -56,7 +69,7 @@ export const authenticateUser = (
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ error: "Invalid token" });
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 };
 
@@ -67,13 +80,20 @@ export const authenticateAdmin = (
   next: NextFunction
 ) => {
   try {
-    const authHeader = req.headers.authorization;
+    // Try to get token from cookie first, then fall back to Authorization header
+    let token = req.cookies?.accessToken;
 
-    if (!authHeader?.startsWith("Bearer ")) {
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+      }
+    }
+
+    if (!token) {
       return res.status(401).json({ error: "No token provided" });
     }
 
-    const token = authHeader.split(" ")[1];
     const decoded = authService.verifyToken(token);
 
     if (decoded.role !== AuthRole.ADMIN) {
@@ -83,7 +103,7 @@ export const authenticateAdmin = (
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ error: "Invalid token" });
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 };
 

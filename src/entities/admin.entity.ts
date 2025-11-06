@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from "typeorm";
 import { Turf } from "./turf.entity";
+import { Session } from "./session.entity";
 
 @Entity("admins")
 export class Admin {
@@ -36,4 +37,7 @@ export class Admin {
 
   @OneToMany(() => Turf, (turf) => turf.owner)
   turfs: Turf[];
+
+  @OneToMany(() => Session, (session) => session.admin)
+  sessions: Session[];
 }

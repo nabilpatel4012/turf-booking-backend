@@ -10,6 +10,7 @@ import {
   restrictToIP,
   authenticateUser,
   authenticateAdmin,
+  authenticate,
 } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -36,6 +37,12 @@ router.post(
   asyncHandler(authController.changeUserPassword)
 );
 
+router.post(
+  "/user/logout",
+  authenticateUser,
+  asyncHandler(authController.logout)
+);
+
 // Admin Routes
 router.post(
   "/admin/register",
@@ -55,6 +62,36 @@ router.post(
   authenticateAdmin,
   validatePasswordChange,
   asyncHandler(authController.changeAdminPassword)
+);
+
+router.post(
+  "/admin/logout",
+  authenticateAdmin,
+  asyncHandler(authController.logout)
+);
+
+// Token Refresh Route (for both users and admins)
+router.post("/refresh-token", asyncHandler(authController.refreshToken));
+
+// Session Management Routes (for both users and admins)
+router.get("/sessions", authenticate, asyncHandler(authController.getSessions));
+
+router.delete(
+  "/sessions/:sessionId",
+  authenticate,
+  asyncHandler(authController.revokeSession)
+);
+
+router.delete(
+  "/sessions/revoke/others",
+  authenticate,
+  asyncHandler(authController.revokeAllOtherSessions)
+);
+
+router.delete(
+  "/sessions/revoke/all",
+  authenticate,
+  asyncHandler(authController.revokeAllSessions)
 );
 
 export default router;

@@ -159,7 +159,9 @@ export const validateAnnouncement = (
 
   if (
     type &&
-    !["general", "maintenance", "promotion", "closure"].includes(type)
+    !["general", "maintenance", "promotion", "closure", "tournament"].includes(
+      type
+    )
   ) {
     throw new AppError("Invalid announcement type", 400);
   }

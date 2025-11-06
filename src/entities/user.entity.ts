@@ -9,6 +9,7 @@ import {
 import { Booking } from "./booking.entity";
 import { Review } from "./review.entity";
 import "reflect-metadata";
+import { Session } from "./session.entity";
 
 @Entity("users")
 export class User {
@@ -41,4 +42,7 @@ export class User {
 
   @OneToMany(() => Review, (review) => review.user)
   reviews: Review[];
+
+  @OneToMany(() => Session, (session) => session.user)
+  sessions: Session[];
 }

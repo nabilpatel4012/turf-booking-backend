@@ -25,6 +25,13 @@ router.post(
   validateAnnouncement,
   asyncHandler(announcementController.createAnnouncement)
 );
+
+router.put(
+  "/announcements/:id",
+  validateAnnouncement,
+  asyncHandler(announcementController.updateAnnouncement)
+);
+
 router.delete(
   "/announcements/:id",
   asyncHandler(announcementController.deleteAnnouncement)
