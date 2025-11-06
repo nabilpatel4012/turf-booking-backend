@@ -14,6 +14,6 @@ router.get(
   "/announcements",
   asyncHandler(announcementController.getAnnouncements)
 );
-router.get("/settings", asyncHandler(settingController.getSettings));
+// router.get("/settings", asyncHandler(settingController.getSettings));
 
 export default router;

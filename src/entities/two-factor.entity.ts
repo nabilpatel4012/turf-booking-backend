@@ -26,7 +26,7 @@ export class TwoFactorAuth {
   isEnabled: boolean;
 
   @Column({ name: "verified_at", type: "timestamp", nullable: true })
-  verifiedAt: Date;
+  verifiedAt: Date | null;
 
   @Column({ name: "last_used_at", type: "timestamp", nullable: true })
   lastUsedAt: Date;

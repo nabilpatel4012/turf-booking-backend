@@ -38,10 +38,10 @@ router.delete(
 );
 
 // Settings
-router.put(
-  "/settings/disable-bookings",
-  asyncHandler(settingController.updateBookingStatus)
-);
+// router.put(
+//   "/settings/disable-bookings",
+//   asyncHandler(settingController.updateBookingStatus)
+// );
 
 // Stats
 router.get("/stats", asyncHandler(statsController.getAdminStats));
