@@ -32,16 +32,12 @@ router.post(
 
 router.post(
   "/user/change-password",
-  authenticateUser,
+  authenticate,
   validatePasswordChange,
   asyncHandler(authController.changeUserPassword)
 );
 
-router.post(
-  "/user/logout",
-  authenticateUser,
-  asyncHandler(authController.logout)
-);
+router.post("/user/logout", authenticate, asyncHandler(authController.logout));
 
 // Admin Routes
 router.post(

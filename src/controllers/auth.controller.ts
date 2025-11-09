@@ -69,7 +69,7 @@ export class AuthController {
     );
 
     // Set access token as HTTP-only cookie
-    res.cookie("accessToken", result.refreshToken, {
+    res.cookie("accessToken", result.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
