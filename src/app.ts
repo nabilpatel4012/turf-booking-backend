@@ -16,7 +16,11 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3001",
+    origin: [
+      process.env.FRONTEND_URL || "http://localhost:3001",
+      "http://localhost:8080",
+      "https://gomyturf.nexpictora.com",
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Forwarded-For"],
