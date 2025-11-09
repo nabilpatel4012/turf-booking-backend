@@ -69,7 +69,12 @@ export class AuthController {
     );
 
     // Set access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, result.accessToken!);
+    res.cookie("accessToken", result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      maxAge: 15 * 60 * 1000,
+    });
 
     // Set refresh token as HTTP-only cookie
     res.cookie("refreshToken", result.refreshToken, {
@@ -100,7 +105,12 @@ export class AuthController {
     );
 
     // Set access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, result.accessToken!);
+    res.cookie("accessToken", result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      maxAge: 15 * 60 * 1000,
+    });
 
     // Set refresh token as HTTP-only cookie
     res.cookie("refreshToken", result.refreshToken, {
