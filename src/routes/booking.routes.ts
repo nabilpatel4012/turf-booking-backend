@@ -19,6 +19,12 @@ router.post(
   asyncHandler(bookingController.createBooking)
 );
 
+router.post(
+  "/:id/verify-payment",
+  authenticate,
+  asyncHandler(bookingController.verifyPayment)
+);
+
 router.get("/", authenticate, asyncHandler(bookingController.getBookings));
 
 router.get(

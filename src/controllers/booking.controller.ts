@@ -11,7 +11,6 @@ export class BookingController {
     this.bookingService = new BookingService();
   }
 
-  // Create booking (Both User and Admin)
   createBooking = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.id;
     const role = req.user!.role;
@@ -146,6 +145,24 @@ export class BookingController {
     res.status(201).json({
       success: true,
       message: "Booking created successfully for user",
+      data: booking,
+    });
+  };
+
+  // Verify payment
+  verifyPayment = async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const { paymentId, signature } = req.body;
+
+    const booking = await this.bookingService.verifyBookingPayment(
+      id,
+      paymentId,
+      signature
+    );
+
+    res.json({
+      success: true,
+      message: "Payment verified and booking confirmed",
       data: booking,
     });
   };

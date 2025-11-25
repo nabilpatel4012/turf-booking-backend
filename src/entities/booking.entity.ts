@@ -61,6 +61,12 @@ export class Booking {
   @Column({ name: "cancellation_reason", type: "text", nullable: true })
   cancellationReason: string;
 
+  @Column({ name: "payment_id", type: "text", nullable: true })
+  paymentId: string;
+
+  @Column({ name: "order_id", type: "text", nullable: true })
+  orderId: string;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

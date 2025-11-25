@@ -8,6 +8,7 @@ import { AppError } from "../middleware/error.middleware";
 import { AuthRole } from "./auth.service";
 import { User } from "../entities/user.entity";
 import { Admin } from "../entities/admin.entity";
+import { PaymentService } from "./payment.service";
 
 export interface CreateBookingDto {
   turfId: string;
@@ -36,7 +37,10 @@ export class BookingService {
     this.settingService = new SettingService();
     this.userRepository = AppDataSource.getRepository(User);
     this.adminRepository = AppDataSource.getRepository(Admin);
+    this.paymentService = new PaymentService();
   }
+
+  private paymentService: PaymentService;
 
   async createBooking(data: CreateBookingDto) {
     const {
@@ -49,89 +53,152 @@ export class BookingService {
       createdByRole,
     } = data;
 
-    // Verify turf exists and is active
-    const turf = await this.turfRepository.findOne({ where: { id: turfId } });
-    if (!turf) {
-      throw new AppError("Turf not found", 404);
-    }
-    if (turf.status !== "active" && createdByRole !== AuthRole.ADMIN) {
-      throw new AppError("This turf is not available for booking", 400);
-    }
+    return await AppDataSource.transaction(async (transactionalEntityManager) => {
+      // 1. Acquire Lock on Turf to prevent concurrent bookings for the same turf
+      // We use pessimistic_write lock to ensure no other transaction can modify this turf
+      // while we are checking for availability.
+      const turf = await transactionalEntityManager.findOne(Turf, {
+        where: { id: turfId },
+        lock: { mode: "pessimistic_write" },
+      });
 
-    // Check if bookings are disabled for this turf (skip for admin)
-    if (createdByRole !== AuthRole.ADMIN) {
-      const isDisabled = await this.settingService.isBookingDisabled(turfId);
-      if (isDisabled.disabled) {
+      if (!turf) {
+        throw new AppError("Turf not found", 404);
+      }
+
+      if (turf.status !== "active" && createdByRole !== AuthRole.ADMIN) {
+        throw new AppError("This turf is not available for booking", 400);
+      }
+
+      // 2. Check if bookings are disabled (skip for admin)
+      if (createdByRole !== AuthRole.ADMIN) {
+        const isDisabled = await this.settingService.isBookingDisabled(turfId);
+        if (isDisabled.disabled) {
+          throw new AppError(
+            `Bookings are currently disabled: ${isDisabled.reason}`,
+            400
+          );
+        }
+      }
+
+      // 3. Validate booking duration
+      const hours =
+        (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+      if (hours < this.minBookingHours) {
         throw new AppError(
-          `Bookings are currently disabled: ${isDisabled.reason}`,
+          `Minimum booking duration is ${this.minBookingHours} hour(s)`,
           400
         );
       }
-    }
 
-    // Validate booking duration
-    const hours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-    if (hours < this.minBookingHours) {
-      throw new AppError(
-        `Minimum booking duration is ${this.minBookingHours} hour(s)`,
-        400
+      // 4. Validate operating hours
+      this.validateOperatingHours(startTime, endTime, turf);
+
+      // 5. Check for overlaps using the transactional entity manager
+      // We must use the transaction manager to ensure we see the latest state
+      // and because we are holding a lock.
+      const overlapCount = await transactionalEntityManager
+        .createQueryBuilder(Booking, "booking")
+        .where("booking.turfId = :turfId", { turfId })
+        .andWhere("booking.status IN (:...statuses)", {
+          statuses: [
+            BookingStatus.PENDING,
+            BookingStatus.CONFIRMED,
+            BookingStatus.ACTIVE,
+          ],
+        })
+        .andWhere("booking.date = :date", { date })
+        .andWhere("booking.startTime < :endTime", { endTime })
+        .andWhere("booking.endTime > :startTime", { startTime })
+        .getCount();
+
+      if (overlapCount > 0) {
+        throw new AppError("Time slot already booked", 409);
+      }
+
+      // 6. Calculate price
+      const price = await this.pricingService.calculatePrice(
+        turfId,
+        startTime,
+        endTime,
+        date
       );
-    }
 
-    // Validate booking time is within turf operating hours
-    this.validateOperatingHours(startTime, endTime, turf);
+      // 7. Get Creator Name
+      let creatorName = "Unknown";
+      if (createdByRole === AuthRole.ADMIN) {
+        const admin = await transactionalEntityManager.findOne(Admin, {
+          where: { id: creatorId },
+        });
+        if (!admin) throw new AppError("Creating admin not found", 404);
+        creatorName = admin.name;
+      } else {
+        const user = await transactionalEntityManager.findOne(User, {
+          where: { id: creatorId },
+        });
+        if (!user) throw new AppError("Creating user not found", 404);
+        creatorName = user.name;
+      }
 
-    // Check for overlaps
-    const hasOverlap = await this.checkOverlap(
-      turfId,
-      date,
-      startTime,
-      endTime
-    );
-    if (hasOverlap) {
-      throw new AppError("Time slot already booked", 409);
-    }
-
-    // Calculate price
-    const price = await this.pricingService.calculatePrice(
-      turfId,
-      startTime,
-      endTime,
-      date
-    );
-
-    // Find the name of the creator
-    let creatorName = "Unknown";
-    if (createdByRole === AuthRole.ADMIN) {
-      const admin = await this.adminRepository.findOne({
-        where: { id: creatorId },
+      // 8. Create Booking Entity
+      const booking = transactionalEntityManager.create(Booking, {
+        turfId,
+        userId,
+        date,
+        startTime,
+        endTime,
+        price,
+        status:
+          createdByRole === AuthRole.ADMIN
+            ? BookingStatus.CONFIRMED
+            : BookingStatus.PENDING,
+        createdBy: creatorName,
       });
-      if (!admin) throw new AppError("Creating admin not found", 404);
-      creatorName = admin.name;
-    } else {
-      const user = await this.userRepository.findOne({
-        where: { id: creatorId },
-      });
-      if (!user) throw new AppError("Creating user not found", 404);
-      creatorName = user.name;
-    }
 
-    const booking = this.bookingRepository.create({
-      turfId,
-      userId,
-      date,
-      startTime,
-      endTime,
-      price,
-      status:
-        createdByRole === AuthRole.ADMIN
-          ? BookingStatus.CONFIRMED
-          : BookingStatus.PENDING,
-      createdBy: creatorName, // Store the fetched name
+      // 9. Save Booking (Initial Save)
+      const savedBooking = await transactionalEntityManager.save(Booking, booking);
+
+      // 10. Handle Payment (Razorpay)
+      // If user is creating, we need to create an order.
+      // If this fails, the transaction will rollback automatically.
+      let razorpayOrder;
+      if (createdByRole === AuthRole.USER) {
+        try {
+          razorpayOrder = await this.paymentService.createOrder(
+            price,
+            savedBooking.id
+          );
+          savedBooking.orderId = razorpayOrder.id;
+          // Update with orderId
+          await transactionalEntityManager.save(Booking, savedBooking);
+        } catch (error) {
+          // Re-throw to trigger rollback
+          throw error;
+        }
+      }
+
+      return { ...savedBooking, razorpayOrder };
     });
+  }
 
-    const savedBooking = await this.bookingRepository.save(booking);
-    return savedBooking;
+  async verifyBookingPayment(bookingId: string, paymentId: string, signature: string) {
+      const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+      if (!booking) {
+          throw new AppError("Booking not found", 404);
+      }
+
+      if (!booking.orderId) {
+          throw new AppError("No payment order associated with this booking", 400);
+      }
+
+      const isValid = this.paymentService.verifyPayment(booking.orderId, paymentId, signature);
+      if (!isValid) {
+          throw new AppError("Invalid payment signature", 400);
+      }
+
+      booking.status = BookingStatus.CONFIRMED;
+      booking.paymentId = paymentId;
+      return await this.bookingRepository.save(booking);
   }
 
   async getUserBookings(
