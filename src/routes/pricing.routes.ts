@@ -11,7 +11,7 @@ const pricingController = new PricingController();
 router.get("/", asyncHandler(pricingController.getPricing));
 
 // Admin routes
-router.put(
+router.post(
   "/admin/update",
   authenticateAdmin,
   validatePricing,
