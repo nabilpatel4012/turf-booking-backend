@@ -15,15 +15,11 @@ export enum DayType {
   WEEKEND = "weekend",
 }
 
-export enum TimeSlot {
-  MORNING = "morning",
-  AFTERNOON = "afternoon",
-  EVENING = "evening",
-}
+
 
 @Entity("pricing")
 @Index(["turfId"])
-@Unique(["turfId", "dayType", "timeSlot"])
+@Index(["turfId", "specificDate"])
 export class Pricing {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -35,23 +31,35 @@ export class Pricing {
     name: "day_type",
     type: "enum",
     enum: DayType,
+    nullable: true, // Nullable because specificDate might take precedence
   })
   dayType: DayType;
 
-  @Column({
-    name: "time_slot",
-    type: "enum",
-    enum: TimeSlot,
-  })
-  timeSlot: TimeSlot;
+  @Column({ name: "specific_date", type: "date", nullable: true })
+  specificDate: Date;
+
+  @Column({ name: "start_time", type: "time" })
+  startTime: string; // Format "HH:mm:ss"
+
+  @Column({ name: "end_time", type: "time" })
+  endTime: string; // Format "HH:mm:ss"
+
+  @Column({ type: "int", default: 0 })
+  priority: number; // Higher number = higher priority
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  name: string; // e.g., "Morning Rush", "Diwali Special"
+
+  @Column({ name: "is_active", type: "boolean", default: true })
+  isActive: boolean;
 
   @Column({
     type: "decimal",
     precision: 10,
     scale: 2,
     transformer: {
-      to: (value: number) => value, // store as-is
-      from: (value: string) => parseFloat(value), // retrieve as number
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value),
     },
   })
   price: number;

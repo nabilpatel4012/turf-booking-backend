@@ -192,25 +192,59 @@ export const validatePricing = (
   res: Response,
   next: NextFunction
 ) => {
-  const { turfId, dayType, timeSlot, price } = req.body;
+  const { turfId, rules } = req.body;
 
-  if (!turfId || !dayType || !timeSlot || price === undefined) {
-    throw new AppError("All pricing fields are required", 400);
+  if (!turfId) {
+    throw new AppError("Turf ID is required", 400);
   }
 
-  if (!["weekday", "weekend"].includes(dayType)) {
-    throw new AppError("Invalid day type. Must be 'weekday' or 'weekend'", 400);
+  if (!rules || !Array.isArray(rules) || rules.length === 0) {
+    throw new AppError("Rules array is required and cannot be empty", 400);
   }
 
-  if (!["morning", "afternoon", "evening"].includes(timeSlot)) {
-    throw new AppError(
-      "Invalid time slot. Must be 'morning', 'afternoon', or 'evening'",
-      400
-    );
-  }
+  for (const rule of rules) {
+    const { startTime, endTime, price, dayType, specificDate } = rule;
 
-  if (price < 0) {
-    throw new AppError("Price must be a positive number", 400);
+    if (!startTime || !endTime || price === undefined) {
+      throw new AppError(
+        "startTime, endTime, and price are required for each rule",
+        400
+      );
+    }
+
+    if (price < 0) {
+      throw new AppError("Price must be a positive number", 400);
+    }
+
+    // Validate time format HH:mm
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+      throw new AppError("Invalid time format. Expected HH:mm", 400);
+    }
+
+    if (!dayType && !specificDate) {
+      throw new AppError(
+        "Either dayType or specificDate must be provided",
+        400
+      );
+    }
+
+    if (dayType && !["weekday", "weekend"].includes(dayType)) {
+      throw new AppError(
+        "Invalid day type. Must be 'weekday' or 'weekend'",
+        400
+      );
+    }
+
+    if (specificDate) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(specificDate)) {
+        throw new AppError(
+          "Invalid specificDate format. Expected YYYY-MM-DD",
+          400
+        );
+      }
+    }
   }
 
   next();

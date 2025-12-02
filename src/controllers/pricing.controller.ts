@@ -30,16 +30,17 @@ export class PricingController {
   // Update pricing for a turf (Admin only - must be owner)
   updatePricing = async (req: AuthRequest, res: Response) => {
     const adminId = req.user!.id;
-    const { turfId, weekday, weekend } = req.body;
+    const { turfId, rules } = req.body;
 
     if (!turfId) {
       return res.status(400).json({ error: "Turf ID is required" });
     }
 
-    const pricing = await this.pricingService.updatePricing(turfId, adminId, {
-      weekday,
-      weekend,
-    });
+    if (!rules || !Array.isArray(rules)) {
+      return res.status(400).json({ error: "Rules array is required" });
+    }
+
+    const pricing = await this.pricingService.updatePricing(turfId, adminId, rules);
 
     res.json({
       success: true,
