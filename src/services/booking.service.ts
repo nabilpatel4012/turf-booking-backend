@@ -9,6 +9,8 @@ import { AuthRole } from "./auth.service";
 import { User } from "../entities/user.entity";
 import { Admin } from "../entities/admin.entity";
 import { PaymentService } from "./payment.service";
+import { BookingView } from "../entities/booking-view.entity";
+import * as bcrypt from "bcryptjs";
 
 export interface CreateBookingDto {
   turfId: string;
@@ -16,22 +18,35 @@ export interface CreateBookingDto {
   date: string;
   startTime: Date;
   endTime: Date;
-  creatorId: string; // Renamed from createdBy for clarity
+  creatorId: string;
   createdByRole: AuthRole;
+}
+
+export interface CreateAdminBookingDto {
+  phone: string;
+  name?: string;
+  turfId: string;
+  date: string;
+  startTime: Date;
+  endTime: Date;
+  adminId: string;
 }
 
 export class BookingService {
   private bookingRepository: Repository<Booking>;
+  private bookingViewRepository: Repository<BookingView>;
   private turfRepository: Repository<Turf>;
   private userRepository: Repository<User>;
   private adminRepository: Repository<Admin>;
   private pricingService: PricingService;
   private settingService: SettingService;
+  private paymentService: PaymentService;
   private readonly minBookingHours: number = 1;
   private readonly cancelHoursThreshold: number = 24;
 
   constructor() {
     this.bookingRepository = AppDataSource.getRepository(Booking);
+    this.bookingViewRepository = AppDataSource.getRepository(BookingView);
     this.turfRepository = AppDataSource.getRepository(Turf);
     this.pricingService = new PricingService();
     this.settingService = new SettingService();
@@ -39,8 +54,6 @@ export class BookingService {
     this.adminRepository = AppDataSource.getRepository(Admin);
     this.paymentService = new PaymentService();
   }
-
-  private paymentService: PaymentService;
 
   async createBooking(data: CreateBookingDto) {
     const {
@@ -54,9 +67,7 @@ export class BookingService {
     } = data;
 
     return await AppDataSource.transaction(async (transactionalEntityManager) => {
-      // 1. Acquire Lock on Turf to prevent concurrent bookings for the same turf
-      // We use pessimistic_write lock to ensure no other transaction can modify this turf
-      // while we are checking for availability.
+      // 1. Acquire Lock on Turf
       const turf = await transactionalEntityManager.findOne(Turf, {
         where: { id: turfId },
         lock: { mode: "pessimistic_write" },
@@ -94,9 +105,7 @@ export class BookingService {
       // 4. Validate operating hours
       this.validateOperatingHours(startTime, endTime, turf);
 
-      // 5. Check for overlaps using the transactional entity manager
-      // We must use the transaction manager to ensure we see the latest state
-      // and because we are holding a lock.
+      // 5. Check for overlaps
       const overlapCount = await transactionalEntityManager
         .createQueryBuilder(Booking, "booking")
         .where("booking.turfId = :turfId", { turfId })
@@ -155,12 +164,10 @@ export class BookingService {
         createdBy: creatorName,
       });
 
-      // 9. Save Booking (Initial Save)
+      // 9. Save Booking
       const savedBooking = await transactionalEntityManager.save(Booking, booking);
 
-      // 10. Handle Payment (Razorpay)
-      // If user is creating, we need to create an order.
-      // If this fails, the transaction will rollback automatically.
+      // 10. Handle Payment (Razorpay) - Only for User
       let razorpayOrder;
       if (createdByRole === AuthRole.USER) {
         try {
@@ -169,15 +176,51 @@ export class BookingService {
             savedBooking.id
           );
           savedBooking.orderId = razorpayOrder.id;
-          // Update with orderId
           await transactionalEntityManager.save(Booking, savedBooking);
         } catch (error) {
-          // Re-throw to trigger rollback
           throw error;
         }
       }
 
       return { ...savedBooking, razorpayOrder };
+    });
+  }
+
+  async createAdminBooking(data: CreateAdminBookingDto) {
+    const { phone, name, turfId, date, startTime, endTime, adminId } = data;
+
+    // 1. Find or Create User
+    let user = await this.userRepository.findOne({ where: { phone } });
+
+    if (!user) {
+      // Create new user
+      const randomPassword = Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      
+      // Generate placeholder email if not provided (assuming email is unique but nullable or we make a fake one)
+      // Since email is likely unique and required in User entity, let's generate a unique one.
+      const email = `guest_${phone}_${Date.now()}@gomyturf.com`;
+
+      user = this.userRepository.create({
+        phone,
+        name: name || "Guest User",
+        email,
+        password: hashedPassword,
+        isActive: true,
+      });
+      await this.userRepository.save(user);
+    }
+
+    // 2. Create Booking using existing logic
+    // We reuse createBooking but pass ADMIN role so it skips payment and confirms immediately
+    return await this.createBooking({
+      turfId,
+      userId: user.id,
+      date,
+      startTime,
+      endTime,
+      creatorId: adminId,
+      createdByRole: AuthRole.ADMIN,
     });
   }
 
@@ -205,7 +248,7 @@ export class BookingService {
     userId: string,
     filters?: { status?: BookingStatus; turfId?: string }
   ) {
-    const queryBuilder = this.bookingRepository
+    const queryBuilder = this.bookingViewRepository // Use View
       .createQueryBuilder("booking")
       .where("booking.userId = :userId", { userId });
 
@@ -230,7 +273,7 @@ export class BookingService {
     date?: string;
     ownerId?: string;
   }) {
-    const queryBuilder = this.bookingRepository.createQueryBuilder("booking");
+    const queryBuilder = this.bookingViewRepository.createQueryBuilder("booking"); // Use View
 
     if (filters?.status) {
       queryBuilder.andWhere("booking.status = :status", {
@@ -249,8 +292,12 @@ export class BookingService {
     }
 
     if (filters?.ownerId) {
+      // The view already has turf details joined, but we might need to join turf table again if ownerId isn't in view
+      // Wait, ownerId is NOT in the view currently.
+      // We can join the turf table to the view or add owner_id to the view.
+      // Let's join turf table.
       queryBuilder
-        .leftJoin("booking.turf", "turf")
+        .leftJoin(Turf, "turf", "booking.turfId = turf.id")
         .andWhere("turf.ownerId = :ownerId", {
           ownerId: filters.ownerId,
         });
@@ -260,10 +307,8 @@ export class BookingService {
   }
 
   async getBookingById(bookingId: string, userId?: string, role?: AuthRole) {
-    const booking = await this.bookingRepository
+    const booking = await this.bookingViewRepository // Use View
       .createQueryBuilder("booking")
-      .leftJoin("booking.turf", "turf")
-      .addSelect("turf.ownerId")
       .where("booking.id = :bookingId", { bookingId })
       .getOne();
 

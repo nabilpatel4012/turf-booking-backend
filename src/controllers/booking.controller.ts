@@ -138,13 +138,35 @@ export class BookingController {
       date,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
-      creatorId: adminId, // MODIFIED
+      creatorId: adminId,
       createdByRole: AuthRole.ADMIN,
     });
 
     res.status(201).json({
       success: true,
       message: "Booking created successfully for user",
+      data: booking,
+    });
+  };
+
+  // Admin create booking by phone (New)
+  createAdminBooking = async (req: AuthRequest, res: Response) => {
+    const adminId = req.user!.id;
+    const { phone, name, turfId, date, startTime, endTime } = req.body;
+
+    const booking = await this.bookingService.createAdminBooking({
+      phone,
+      name,
+      turfId,
+      date,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      adminId,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Booking created successfully",
       data: booking,
     });
   };

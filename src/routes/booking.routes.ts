@@ -47,6 +47,13 @@ router.post(
   asyncHandler(bookingController.createBookingForUser)
 );
 
+router.post(
+  "/admin/create-by-phone",
+  authenticateAdmin,
+  // validateBooking, // We might need a specific validator for this, or update validateBooking
+  asyncHandler(bookingController.createAdminBooking)
+);
+
 router.patch(
   "/admin/:id/confirm",
   authenticateAdmin,
