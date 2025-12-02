@@ -198,8 +198,8 @@ export const validatePricing = (
     throw new AppError("Turf ID is required", 400);
   }
 
-  if (!rules || !Array.isArray(rules) || rules.length === 0) {
-    throw new AppError("Rules array is required and cannot be empty", 400);
+  if (!rules || !Array.isArray(rules)) {
+    throw new AppError("Rules array is required", 400);
   }
 
   for (const rule of rules) {
