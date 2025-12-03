@@ -7,6 +7,7 @@ import {
 } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/error.middleware";
 import { validateBooking } from "../middleware/validation.middleware";
+import { validateApiKey } from "../middleware/api-key.middleware";
 
 const router = Router();
 const bookingController = new BookingController();
@@ -23,6 +24,12 @@ router.post(
   "/:id/verify-payment",
   authenticate,
   asyncHandler(bookingController.verifyPayment)
+);
+
+router.post(
+  "/update-payment-status",
+  validateApiKey,
+  asyncHandler(bookingController.updatePaymentStatus)
 );
 
 router.get("/", authenticate, asyncHandler(bookingController.getBookings));

@@ -236,4 +236,20 @@ export class BookingController {
       data: booking,
     });
   };
+
+  // Update payment status (Simple)
+  updatePaymentStatus = async (req: AuthRequest, res: Response) => {
+    const { orderId, paymentId } = req.body;
+
+    const booking = await this.bookingService.updateBookingPaymentStatus(
+      orderId,
+      paymentId
+    );
+
+    res.json({
+      success: true,
+      message: "Payment status updated and booking confirmed",
+      data: booking,
+    });
+  };
 }

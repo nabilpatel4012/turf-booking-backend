@@ -287,6 +287,22 @@ export class BookingService {
       return await this.bookingRepository.save(booking);
   }
 
+  async updateBookingPaymentStatus(orderId: string, paymentId: string) {
+    const booking = await this.bookingRepository.findOne({ where: { orderId } });
+
+    if (!booking) {
+      throw new AppError("Booking with this order ID not found", 404);
+    }
+
+    if (booking.status === BookingStatus.PENDING) {
+      booking.status = BookingStatus.CONFIRMED;
+      booking.paymentId = paymentId;
+      return await this.bookingRepository.save(booking);
+    }
+
+    return booking;
+  }
+
   async getUserBookings(
     userId: string,
     filters?: { status?: BookingStatus; turfId?: string }

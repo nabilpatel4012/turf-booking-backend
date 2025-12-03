@@ -26,6 +26,10 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Forwarded-For"],
 };
 
+// Allow any origin for the update payment status endpoint (Webhook/External)
+app.use("/api/bookings/update-payment-status", cors({ origin: "*" }));
+app.options("/api/bookings/update-payment-status", cors({ origin: "*" }));
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
