@@ -3,6 +3,7 @@ import { Pricing, DayType } from "../entities/pricing.entity";
 import { Turf } from "../entities/turf.entity";
 import { AppDataSource } from "../db/data.source";
 import { AppError } from "../middleware/error.middleware";
+import { toZonedTime } from "date-fns-tz";
 
 interface PricingRuleInput {
   dayType?: DayType;
@@ -27,7 +28,8 @@ export class PricingService {
     turfId: string,
     startTime: Date,
     endTime: Date,
-    date: string
+    date: string,
+    timezone: string = "Asia/Kolkata"
   ): Promise<number> {
     const dateObj = new Date(date);
     const dayOfWeek = dateObj.getDay();
@@ -41,23 +43,71 @@ export class PricingService {
     });
 
     let totalPrice = 0;
-    const startHour = startTime.getHours();
-    const endHour = endTime.getHours() === 0 ? 24 : endTime.getHours(); // Handle midnight
-    const duration = endHour - startHour;
+    
+    // Convert to Turf's timezone for calculation
+    const zonedStart = toZonedTime(startTime, timezone);
+    const zonedEnd = toZonedTime(endTime, timezone);
 
-    // Calculate price for each hour block
-    for (let i = 0; i < duration; i++) {
-      const currentHour = startHour + i;
-      const hourPrice = this.getPriceForHour(
-        rules,
-        currentHour,
-        dateObj,
-        dayType
-      );
-      totalPrice += hourPrice;
+    // Calculate total duration in minutes
+    const totalDurationMinutes = (zonedEnd.getTime() - zonedStart.getTime()) / (1000 * 60);
+    
+    // We need to iterate through time blocks and apply rules
+    // Simplest approach: Iterate minute by minute? No, too slow.
+    // Better: Iterate through rules and find overlap.
+    // Or: Iterate through hours? But we have partial hours.
+    
+    // Let's iterate through the duration in 30-min chunks or just calculate overlap with each rule.
+    // But rules might overlap each other (priority).
+    // So we need to find the "winning" rule for each time segment.
+    
+    // Approach:
+    // 1. Define the booking interval [start, end]
+    // 2. Break it down into segments based on rule boundaries?
+    // 3. Or just iterate hour by hour (and partial start/end)?
+    // Most rules are hourly based (start hour, end hour).
+    
+    const startHour = zonedStart.getHours();
+    const startMinute = zonedStart.getMinutes();
+    const endHour = zonedEnd.getHours();
+    const endMinute = zonedEnd.getMinutes();
+    
+    // Normalize end hour for midnight (if 00:00 next day, treat as 24:00)
+    // Note: zonedEnd might be next day.
+    // If booking spans days, we need to handle that.
+    // Assuming single day booking for now as per current logic.
+    
+    // Let's iterate through each hour covered by the booking
+    // e.g. 14:30 to 16:00
+    // Hour 14: 30 mins (14:30 - 15:00)
+    // Hour 15: 60 mins (15:00 - 16:00)
+    
+    let current = new Date(zonedStart);
+    while (current < zonedEnd) {
+        // Get the end of the current hour
+        const nextHour = new Date(current);
+        nextHour.setHours(current.getHours() + 1, 0, 0, 0);
+        
+        // The segment end is either the next hour or the booking end
+        const segmentEnd = nextHour < zonedEnd ? nextHour : zonedEnd;
+        
+        // Calculate duration of this segment in hours
+        const segmentDurationHours = (segmentEnd.getTime() - current.getTime()) / (1000 * 60 * 60);
+        
+        // Find price for this hour
+        const hourPrice = this.getPriceForHour(
+            rules,
+            current.getHours(),
+            dateObj,
+            dayType
+        );
+        
+        totalPrice += hourPrice * segmentDurationHours;
+        
+        // Move to next segment
+        current = segmentEnd;
     }
 
-    return totalPrice;
+    return Math.round(totalPrice * 100) / 100; // Round to 2 decimal places
   }
 
   private getPriceForHour(

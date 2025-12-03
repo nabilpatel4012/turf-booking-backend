@@ -12,6 +12,7 @@ import { PaymentService } from "./payment.service";
 import { BookingView } from "../entities/booking-view.entity";
 import * as bcrypt from "bcryptjs";
 import { TurfSettingService } from "./turf-setting.service";
+import { toZonedTime } from "date-fns-tz";
 
 export interface CreateBookingDto {
   turfId: string;
@@ -90,11 +91,14 @@ export class BookingService {
     }
 
     // 2. Check if bookings are disabled (skip for admin)
+    const turfSettings = await this.turfSettingService.getTurfSettings(turfId);
+    const timezone = turfSettings.timezone || "Asia/Kolkata";
+
     if (createdByRole !== AuthRole.ADMIN) {
-      const isDisabled = await this.settingService.isBookingDisabled(turfId);
-      if (isDisabled.disabled) {
+      const allowed = await this.turfSettingService.isBookingAllowed(turfId);
+      if (!allowed.allowed) {
         throw new AppError(
-          `Bookings are currently disabled: ${isDisabled.reason}`,
+          `Bookings are currently disabled: ${allowed.reason}`,
           400
         );
       }
@@ -103,15 +107,17 @@ export class BookingService {
     // 3. Validate booking duration
     const hours =
       (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-    if (hours < this.minBookingHours) {
+    const minHours = turfSettings.minBookingHours || this.minBookingHours;
+    
+    if (hours < minHours) {
       throw new AppError(
-        `Minimum booking duration is ${this.minBookingHours} hour(s)`,
+        `Minimum booking duration is ${minHours} hour(s)`,
         400
       );
     }
 
     // 4. Validate operating hours
-    this.validateOperatingHours(startTime, endTime, turf);
+    this.validateOperatingHours(startTime, endTime, turf, timezone);
 
     // 5. Check for overlaps
     const overlapCount = await transactionalEntityManager
@@ -138,7 +144,8 @@ export class BookingService {
       turfId,
       startTime,
       endTime,
-      date
+      date,
+      timezone
     );
 
     // 7. Get Creator Name
@@ -531,11 +538,14 @@ export class BookingService {
 
     // Check cancellation time threshold (skip for admin)
     if (role === AuthRole.USER) {
+      const turfSettings = await this.turfSettingService.getTurfSettings(booking.turfId);
+      const cancelThreshold = turfSettings.cancellationDeadlineHours || this.cancelHoursThreshold;
+      
       const hoursDiff =
         (booking.startTime.getTime() - Date.now()) / (1000 * 60 * 60);
-      if (hoursDiff < this.cancelHoursThreshold) {
+      if (hoursDiff < cancelThreshold) {
         throw new AppError(
-          `Cannot cancel booking within ${this.cancelHoursThreshold} hours of start time`,
+          `Cannot cancel booking within ${cancelThreshold} hours of start time`,
           400
         );
       }
@@ -600,11 +610,15 @@ export class BookingService {
     return await this.bookingRepository.save(booking);
   }
 
-  private validateOperatingHours(startTime: Date, endTime: Date, turf: Turf) {
-    const startHour = startTime.getHours();
-    const startMinute = startTime.getMinutes();
-    const endHour = endTime.getHours();
-    const endMinute = endTime.getMinutes();
+  private validateOperatingHours(startTime: Date, endTime: Date, turf: Turf, timezone: string) {
+    // Convert UTC times to Turf's timezone
+    const zonedStart = toZonedTime(startTime, timezone);
+    const zonedEnd = toZonedTime(endTime, timezone);
+
+    const startHour = zonedStart.getHours();
+    const startMinute = zonedStart.getMinutes();
+    const endHour = zonedEnd.getHours();
+    const endMinute = zonedEnd.getMinutes();
 
     const [openHour, openMinute] = turf.openingTime.split(":").map(Number);
     const [closeHour, closeMinute] = turf.closingTime.split(":").map(Number);
@@ -614,11 +628,43 @@ export class BookingService {
     const openMinutes = openHour * 60 + openMinute;
     const closeMinutes = closeHour * 60 + closeMinute;
 
-    if (startMinutes < openMinutes || endMinutes > closeMinutes) {
-      throw new AppError(
-        `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
-        400
-      );
+    // Handle overnight closing (e.g., closes at 02:00 next day)
+    // If close time is smaller than open time, it means it crosses midnight
+    if (closeMinutes < openMinutes) {
+        // If start time is before close time (e.g. 01:00), it's valid (next day)
+        // If start time is after open time (e.g. 23:00), it's valid (same day)
+        // But we need to check the full range.
+        // Simplest check: if endMinutes > closeMinutes AND startMinutes < openMinutes, then invalid
+        // Wait, this logic is tricky.
+        // Let's assume standard operating hours for now, or simple midnight crossing.
+        // If crossing midnight, we can say:
+        // Valid if (start >= open) OR (end <= close)
+        // But a booking can span across midnight?
+        // Let's stick to simple logic: if start < open AND start > close (assuming close < open), then invalid.
+        
+        // Actually, if close < open, then the closed period is between close and open.
+        if (startMinutes > closeMinutes && startMinutes < openMinutes) {
+             throw new AppError(
+                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
+                400
+            );
+        }
+        
+        // Also check end time
+        if (endMinutes > closeMinutes && endMinutes < openMinutes) {
+             throw new AppError(
+                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
+                400
+            );
+        }
+    } else {
+        // Standard day hours
+        if (startMinutes < openMinutes || endMinutes > closeMinutes) {
+            throw new AppError(
+                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
+                400
+            );
+        }
     }
   }
 
