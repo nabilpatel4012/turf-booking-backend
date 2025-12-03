@@ -68,28 +68,38 @@ export class PricingService {
   ): number {
     // Filter rules that match the criteria
     const matchingRules = rules.filter((rule) => {
-      // 1. Check date/day type match
-      let dateMatch = false;
-      if (rule.specificDate) {
-        const ruleDate = new Date(rule.specificDate);
-        dateMatch =
-          ruleDate.toISOString().split("T")[0] ===
-          date.toISOString().split("T")[0];
-      } else {
-        dateMatch = rule.dayType === dayType;
+      try {
+        // 1. Check date/day type match
+        let dateMatch = false;
+        if (rule.specificDate) {
+          const ruleDate = new Date(rule.specificDate);
+          dateMatch =
+            ruleDate.toISOString().split("T")[0] ===
+            date.toISOString().split("T")[0];
+        } else {
+          dateMatch = rule.dayType === dayType;
+        }
+
+        if (!dateMatch) return false;
+
+        // 2. Check time match
+        if (typeof rule.startTime !== 'string' || typeof rule.endTime !== 'string') {
+            console.warn(`Invalid time format for rule ${rule.id}: startTime=${rule.startTime}, endTime=${rule.endTime}`);
+            return false;
+        }
+
+        const ruleStart = parseInt(rule.startTime.split(":")[0]);
+        const ruleEnd = parseInt(rule.endTime.split(":")[0]);
+        
+        // Handle midnight crossing if needed (assuming simple daily slots for now)
+        // If ruleEnd is 00, treat as 24
+        const effectiveRuleEnd = ruleEnd === 0 ? 24 : ruleEnd;
+
+        return hour >= ruleStart && hour < effectiveRuleEnd;
+      } catch (err) {
+        console.error(`Error processing rule ${rule.id}:`, err);
+        return false;
       }
-
-      if (!dateMatch) return false;
-
-      // 2. Check time match
-      const ruleStart = parseInt(rule.startTime.split(":")[0]);
-      const ruleEnd = parseInt(rule.endTime.split(":")[0]);
-      
-      // Handle midnight crossing if needed (assuming simple daily slots for now)
-      // If ruleEnd is 00, treat as 24
-      const effectiveRuleEnd = ruleEnd === 0 ? 24 : ruleEnd;
-
-      return hour >= ruleStart && hour < effectiveRuleEnd;
     });
 
     if (matchingRules.length === 0) {
@@ -101,9 +111,11 @@ export class PricingService {
     }
 
     // Since we sorted by priority DESC in the query, the first match is the best one
-    // But we need to handle specificDate vs dayType precedence if priorities are equal?
-    // Actually, explicit priority field handles this. Users should set higher priority for specific dates.
-    return Number(matchingRules[0].price);
+    const price = Number(matchingRules[0].price);
+    if (isNaN(price)) {
+        throw new AppError(`Invalid price configuration for rule ${matchingRules[0].id}`, 500);
+    }
+    return price;
   }
 
   async getAllPricing(turfId: string) {
