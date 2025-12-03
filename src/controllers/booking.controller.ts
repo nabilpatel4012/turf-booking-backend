@@ -3,12 +3,21 @@ import { BookingService } from "../services/booking.service";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { AuthRole } from "../services/auth.service";
 import { BookingStatus } from "../entities/booking.entity";
+import { AppDataSource } from "../db/data.source";
+import { User } from "../entities/user.entity";
+import { Admin } from "../entities/admin.entity";
+import * as bcrypt from "bcryptjs";
+import { Repository } from "typeorm";
 
 export class BookingController {
   private bookingService: BookingService;
+  private userRepository: Repository<User>;
+  private adminRepository: Repository<Admin>;
 
   constructor() {
     this.bookingService = new BookingService();
+    this.userRepository = AppDataSource.getRepository(User);
+    this.adminRepository = AppDataSource.getRepository(Admin);
   }
 
   createBooking = async (req: AuthRequest, res: Response) => {
@@ -16,13 +25,41 @@ export class BookingController {
     const role = req.user!.role;
     const { turfId, date, startTime, endTime } = req.body;
 
+    let bookingUserId = userId;
+
+    // If Admin is booking, ensure they have a User account (Shadow User)
+    if (role === AuthRole.ADMIN) {
+      const admin = await this.adminRepository.findOne({ where: { id: userId } });
+      if (!admin) {
+        throw new Error("Admin not found");
+      }
+
+      let user = await this.userRepository.findOne({ where: { email: admin.email } });
+
+      if (!user) {
+        // Create shadow user for admin
+        const randomPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+        user = this.userRepository.create({
+          email: admin.email,
+          name: admin.name,
+          phone: admin.phone || undefined,
+          password: hashedPassword,
+          isActive: true,
+        });
+        await this.userRepository.save(user);
+      }
+      bookingUserId = user.id;
+    }
+
     const booking = await this.bookingService.createBooking({
       turfId,
-      userId,
+      userId: bookingUserId,
       date,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
-      creatorId: userId, // MODIFIED
+      creatorId: userId, // Original creator (Admin or User)
       createdByRole: role,
     });
 
