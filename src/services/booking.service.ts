@@ -791,4 +791,128 @@ export class BookingService {
 
     return await queryBuilder.getCount();
   }
+  async verifyQR(
+    adminId: string,
+    params: {
+      bookingId?: string;
+      turfId: string;
+      orderId?: string;
+      paymentId?: string;
+    }
+  ) {
+    const { bookingId, turfId, orderId, paymentId } = params;
+
+    // 1. Verify Turf Ownership
+    const turf = await this.turfRepository.findOne({
+      where: { id: turfId },
+      select: ["ownerId", "name", "openingTime", "closingTime"],
+    });
+
+    if (!turf) {
+      throw new AppError("Turf not found", 404);
+    }
+
+    if (turf.ownerId !== adminId) {
+      throw new AppError("Unauthorized: You do not own this turf", 403);
+    }
+
+    // 2. Find Booking
+    let booking: Booking | null = null;
+
+    if (bookingId) {
+      booking = await this.bookingRepository.findOne({
+        where: { id: bookingId },
+        relations: ["user"],
+      });
+    } else if (orderId) {
+      booking = await this.bookingRepository.findOne({
+        where: { orderId },
+        relations: ["user"],
+      });
+    }
+
+    if (!booking) {
+      return {
+        valid: false,
+        message: "Booking not found",
+        booking: null,
+      };
+    }
+
+    // 3. Validate Booking Details
+    if (booking.turfId !== turfId) {
+      return {
+        valid: false,
+        message: "Invalid Turf: Booking does not belong to this turf",
+        booking: { ...booking, user: { name: booking.user?.name, phone: booking.user?.phone } },
+      };
+    }
+
+    // Check Date (Must be today)
+    const today = new Date();
+    const bookingDate = new Date(booking.date);
+    const turfSettings = await this.turfSettingService.getTurfSettings(turfId);
+    const timezone = turfSettings.timezone || "Asia/Kolkata";
+    
+    // Convert both to turf's timezone to compare dates
+    const zonedToday = toZonedTime(today, timezone);
+    const zonedBookingDate = toZonedTime(bookingDate, timezone);
+
+    // Compare YYYY-MM-DD
+    const isToday = zonedToday.toISOString().split('T')[0] === booking.date; // booking.date is string YYYY-MM-DD
+    
+    // Note: booking.date is stored as string YYYY-MM-DD. 
+    // If we want to be strict, we should compare it with today's date in turf's timezone.
+    const todayString = formatInTimeZone(new Date(), timezone, 'yyyy-MM-dd');
+    
+    if (booking.date !== todayString) {
+         return {
+            valid: false,
+            message: `Invalid Date: Booking is for ${booking.date}, today is ${todayString}`,
+            booking: { ...booking, user: { name: booking.user?.name, phone: booking.user?.phone } },
+        };
+    }
+
+    // Check Status
+    if (booking.status === BookingStatus.CANCELLED) {
+      return {
+        valid: false,
+        message: "Booking is Cancelled",
+        booking: { ...booking, user: { name: booking.user?.name, phone: booking.user?.phone } },
+      };
+    }
+
+    // 4. Payment Check
+    let paymentStatus = "Paid";
+    if (turfSettings.requireAdvancePayment) {
+        if (booking.status !== BookingStatus.CONFIRMED) {
+             paymentStatus = "Payment Pending";
+             // If payment is required but not confirmed, it's invalid for entry?
+             // Or just warn? User said "return Payment pending for all the cases it should work"
+             // So we return valid: true (or false?) but with message?
+             // "verify that... return Payment pending"
+             // Let's return valid: false if payment pending? Or valid: true but message says pending?
+             // Usually entry is denied if not paid.
+             // But maybe they pay at venue?
+             // "Payment pending for all the cases it should work" -> implies we should return this status.
+             
+             return {
+                 valid: true, // Allow them to scan, but show payment pending
+                 message: "Payment Pending",
+                 booking: { ...booking, user: { name: booking.user?.name, phone: booking.user?.phone } },
+                 paymentStatus: "Pending"
+             };
+        }
+    }
+
+    return {
+      valid: true,
+      message: "Access Granted",
+      booking: { ...booking, user: { name: booking.user?.name, phone: booking.user?.phone } },
+      paymentStatus
+    };
+  }
 }
+
+// Helper for date formatting if needed, or import from date-fns-tz
+import { formatInTimeZone } from "date-fns-tz";

@@ -40,11 +40,8 @@ router.get(
   asyncHandler(bookingController.getBookingById)
 );
 
-router.get(
-  "/turf/:turfId",
-  authenticate,
-  asyncHandler(bookingController.getBookingsByTurfId)
-);
+router.get("/turf/:turfId", authenticate, bookingController.getBookingsByTurfId);
+router.get("/verify-qr", authenticate, bookingController.verifyQR);
 
 router.delete(
   "/:id",

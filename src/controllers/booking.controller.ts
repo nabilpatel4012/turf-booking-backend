@@ -8,6 +8,7 @@ import { User } from "../entities/user.entity";
 import { Admin } from "../entities/admin.entity";
 import * as bcrypt from "bcryptjs";
 import { Repository } from "typeorm";
+import { AppError } from "../middleware/error.middleware";
 
 export class BookingController {
   private bookingService: BookingService;
@@ -278,6 +279,27 @@ export class BookingController {
       success: true,
       message: "Payment status updated and booking confirmed",
       data: booking,
+    });
+  };
+
+  verifyQR = async (req: AuthRequest, res: Response) => {
+    const adminId = req.user!.id;
+    const { bookingId, turfId, orderId, paymentId } = req.query;
+
+    if (!turfId) {
+      throw new AppError("Turf ID is required", 400);
+    }
+
+    const result = await this.bookingService.verifyQR(adminId, {
+      bookingId: bookingId as string,
+      turfId: turfId as string,
+      orderId: orderId as string,
+      paymentId: paymentId as string,
+    });
+
+    res.status(200).json({
+      success: true,
+      ...result,
     });
   };
 }
