@@ -32,6 +32,8 @@ router.post(
   asyncHandler(bookingController.updatePaymentStatus)
 );
 
+router.get("/verify-qr", authenticate, bookingController.verifyQR);
+router.get("/turf/:turfId", authenticate, bookingController.getBookingsByTurfId);
 router.get("/", authenticate, asyncHandler(bookingController.getBookings));
 
 router.get(
@@ -40,8 +42,7 @@ router.get(
   asyncHandler(bookingController.getBookingById)
 );
 
-router.get("/turf/:turfId", authenticate, bookingController.getBookingsByTurfId);
-router.get("/verify-qr", authenticate, bookingController.verifyQR);
+
 
 router.delete(
   "/:id",
