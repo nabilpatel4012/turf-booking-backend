@@ -25,10 +25,10 @@ export class BookingController {
     const role = req.user!.role;
     const { turfId, date, startTime, endTime } = req.body;
 
-    let bookingUserId = userId;
+    let booking;
 
-    // If Admin is booking, ensure they have a User account (Shadow User)
     if (role === AuthRole.ADMIN) {
+      // If Admin is booking, ensure they have a User account (Shadow User)
       const admin = await this.adminRepository.findOne({ where: { id: userId } });
       if (!admin) {
         throw new Error("Admin not found");
@@ -50,18 +50,29 @@ export class BookingController {
         });
         await this.userRepository.save(user);
       }
-      bookingUserId = user.id;
-    }
+      const bookingUserId = user.id;
 
-    const booking = await this.bookingService.createBooking({
-      turfId,
-      userId: bookingUserId,
-      date,
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
-      creatorId: userId, // Original creator (Admin or User)
-      createdByRole: role,
-    });
+      booking = await this.bookingService.createBookingForAdmin({
+        turfId,
+        userId: bookingUserId,
+        date,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        creatorId: userId,
+        createdByRole: role,
+      });
+    } else {
+      // User booking
+      booking = await this.bookingService.createBookingForUser({
+        turfId,
+        userId,
+        date,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        creatorId: userId,
+        createdByRole: role,
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -74,7 +85,7 @@ export class BookingController {
   getBookings = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.id;
     const role = req.user!.role;
-    const { status, turfId, date } = req.query;
+    const { status, turfId, date, ownerId } = req.query;
 
     let bookings;
 
@@ -90,13 +101,12 @@ export class BookingController {
         status: status as BookingStatus,
         turfId: turfId as string,
         date: date as string,
-        ownerId: userId,
+        ownerId: ownerId as string,
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
-      count: bookings.length,
       data: bookings,
     });
   };
@@ -109,7 +119,7 @@ export class BookingController {
 
     const booking = await this.bookingService.getBookingById(id, userId, role);
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: booking,
     });
@@ -129,7 +139,7 @@ export class BookingController {
       reason
     );
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: "Booking cancelled successfully",
       data: booking,
@@ -166,22 +176,23 @@ export class BookingController {
 
   // Admin create booking for user
   createBookingForUser = async (req: AuthRequest, res: Response) => {
-    const adminId = req.user!.id;
     const { userId, turfId, date, startTime, endTime } = req.body;
+    const creatorId = req.user!.id;
+    const role = req.user!.role; // Should be ADMIN
 
-    const booking = await this.bookingService.createBooking({
-      turfId,
-      userId,
-      date,
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
-      creatorId: adminId,
-      createdByRole: AuthRole.ADMIN,
+    const booking = await this.bookingService.createBookingForAdmin({
+        turfId,
+        userId,
+        date,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        creatorId,
+        createdByRole: role,
     });
 
     res.status(201).json({
       success: true,
-      message: "Booking created successfully for user",
+      message: "Booking created successfully",
       data: booking,
     });
   };
@@ -191,7 +202,7 @@ export class BookingController {
     const adminId = req.user!.id;
     const { phone, name, turfId, date, startTime, endTime } = req.body;
 
-    const booking = await this.bookingService.createAdminBooking({
+    const booking = await this.bookingService.createGuestBooking({
       phone,
       name,
       turfId,
