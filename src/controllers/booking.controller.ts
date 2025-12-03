@@ -82,32 +82,60 @@ export class BookingController {
   };
 
   // Get bookings (User: their own, Admin: all for their turfs)
+  // Get bookings (User: their own, Admin: all for their turfs)
   getBookings = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.id;
     const role = req.user!.role;
-    const { status, turfId, date, ownerId } = req.query;
+    const { status, turfId, date, ownerId, turfName, page, limit } = req.query;
 
-    let bookings;
+    let result;
 
     if (role === AuthRole.USER) {
       // Users see only their bookings
-      bookings = await this.bookingService.getUserBookings(userId, {
+      result = await this.bookingService.getUserBookings(userId, {
         status: status as BookingStatus,
         turfId: turfId as string,
+        turfName: turfName as string,
+        date: date as string,
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 10,
       });
     } else {
       // Admins see bookings for their turfs
-      bookings = await this.bookingService.getAllBookings({
+      result = await this.bookingService.getAllBookings({
         status: status as BookingStatus,
         turfId: turfId as string,
         date: date as string,
         ownerId: ownerId as string,
+        turfName: turfName as string,
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 10,
       });
     }
 
     res.status(200).json({
       success: true,
-      data: bookings,
+      data: result.data,
+      meta: result.meta,
+    });
+  };
+
+  // Get bookings by Turf ID (Public/Protected based on requirement, assuming protected for now)
+  getBookingsByTurfId = async (req: AuthRequest, res: Response) => {
+    const { turfId } = req.params;
+    const { status, date, page, limit } = req.query;
+
+    const result = await this.bookingService.getBookingsByTurfId(turfId, {
+      status: status as BookingStatus,
+      date: date as string,
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 10,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: result.data,
+      meta: result.meta,
     });
   };
 

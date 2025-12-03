@@ -40,6 +40,12 @@ router.get(
   asyncHandler(bookingController.getBookingById)
 );
 
+router.get(
+  "/turf/:turfId",
+  authenticate,
+  asyncHandler(bookingController.getBookingsByTurfId)
+);
+
 router.delete(
   "/:id",
   authenticate,

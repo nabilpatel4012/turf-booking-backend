@@ -305,9 +305,20 @@ export class BookingService {
 
   async getUserBookings(
     userId: string,
-    filters?: { status?: BookingStatus; turfId?: string }
+    filters?: {
+      status?: BookingStatus;
+      turfId?: string;
+      turfName?: string;
+      date?: string;
+      page?: number;
+      limit?: number;
+    }
   ) {
-    const queryBuilder = this.bookingViewRepository // Use View
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.bookingViewRepository
       .createQueryBuilder("booking")
       .where("booking.userId = :userId", { userId });
 
@@ -323,7 +334,31 @@ export class BookingService {
       });
     }
 
-    return await queryBuilder.orderBy("booking.createdAt", "DESC").getMany();
+    if (filters?.turfName) {
+      queryBuilder.andWhere("booking.turfName ILIKE :turfName", {
+        turfName: `%${filters.turfName}%`,
+      });
+    }
+
+    if (filters?.date) {
+      queryBuilder.andWhere("booking.date = :date", { date: filters.date });
+    }
+
+    const [data, total] = await queryBuilder
+      .orderBy("booking.createdAt", "DESC")
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getAllBookings(filters?: {
@@ -331,8 +366,15 @@ export class BookingService {
     turfId?: string;
     date?: string;
     ownerId?: string;
+    turfName?: string;
+    page?: number;
+    limit?: number;
   }) {
-    const queryBuilder = this.bookingViewRepository.createQueryBuilder("booking"); // Use View
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.bookingViewRepository.createQueryBuilder("booking");
 
     if (filters?.status) {
       queryBuilder.andWhere("booking.status = :status", {
@@ -350,11 +392,13 @@ export class BookingService {
       queryBuilder.andWhere("booking.date = :date", { date: filters.date });
     }
 
+    if (filters?.turfName) {
+      queryBuilder.andWhere("booking.turfName ILIKE :turfName", {
+        turfName: `%${filters.turfName}%`,
+      });
+    }
+
     if (filters?.ownerId) {
-      // The view already has turf details joined, but we might need to join turf table again if ownerId isn't in view
-      // Wait, ownerId is NOT in the view currently.
-      // We can join the turf table to the view or add owner_id to the view.
-      // Let's join turf table.
       queryBuilder
         .leftJoin(Turf, "turf", "booking.turfId = turf.id")
         .andWhere("turf.ownerId = :ownerId", {
@@ -362,7 +406,65 @@ export class BookingService {
         });
     }
 
-    return await queryBuilder.orderBy("booking.createdAt", "DESC").getMany();
+    const [data, total] = await queryBuilder
+      .orderBy("booking.createdAt", "DESC")
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getBookingsByTurfId(
+    turfId: string,
+    filters?: {
+      status?: BookingStatus;
+      date?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 100;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.bookingViewRepository
+      .createQueryBuilder("booking")
+      .where("booking.turfId = :turfId", { turfId });
+
+    if (filters?.status) {
+      queryBuilder.andWhere("booking.status = :status", {
+        status: filters.status,
+      });
+    }
+
+    if (filters?.date) {
+      queryBuilder.andWhere("booking.date = :date", { date: filters.date });
+    }
+
+    const [data, total] = await queryBuilder
+      .orderBy("booking.createdAt", "DESC")
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getBookingById(bookingId: string, userId?: string, role?: AuthRole) {
