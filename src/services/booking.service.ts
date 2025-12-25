@@ -14,6 +14,7 @@ import * as bcrypt from "bcryptjs";
 import { TurfSettingService } from "./turf-setting.service";
 import { toZonedTime } from "date-fns-tz";
 
+
 export interface CreateBookingDto {
   turfId: string;
   userId: string;
@@ -43,6 +44,7 @@ export class BookingService {
   private pricingService: PricingService;
   private settingService: SettingService;
   private paymentService: PaymentService;
+
   private readonly minBookingHours: number = 1;
   private readonly cancelHoursThreshold: number = 24;
 
@@ -58,6 +60,7 @@ export class BookingService {
     this.userRepository = AppDataSource.getRepository(User);
     this.adminRepository = AppDataSource.getRepository(Admin);
     this.paymentService = new PaymentService();
+
   }
 
   // Internal method to handle core booking logic within a transaction
@@ -181,7 +184,8 @@ export class BookingService {
   }
 
   async createBookingForUser(data: CreateBookingDto) {
-    return await AppDataSource.transaction(async (transactionalEntityManager) => {
+    // 1. Create Booking in Transaction
+    const result = await AppDataSource.transaction(async (transactionalEntityManager) => {
       // Create booking with PENDING status
       const booking = await this._createBookingInternal(
         data,
@@ -191,36 +195,84 @@ export class BookingService {
 
       // Check Turf Settings for Payment
       const turfSettings = await this.turfSettingService.getTurfSettings(data.turfId);
+      let razorpayOrder = undefined;
+      let advanceAmount = 0;
 
       if (turfSettings.requireAdvancePayment) {
-        const advanceAmount = (booking.price * turfSettings.advancePaymentPercentage) / 100;
+        advanceAmount = (booking.price * turfSettings.advancePaymentPercentage) / 100;
         
         if (advanceAmount > 0) {
           try {
-            const razorpayOrder = await this.paymentService.createOrder(
+             razorpayOrder = await this.paymentService.createOrder(
               advanceAmount,
               booking.id
             );
             booking.orderId = razorpayOrder.id;
             await transactionalEntityManager.save(Booking, booking);
-            return { ...booking, razorpayOrder, advanceAmount };
           } catch (error) {
             throw new AppError("Failed to initiate payment", 500);
           }
         }
       }
 
-      // If no payment required, return booking (it stays PENDING until confirmed manually or auto-confirmed?)
-      // Usually if no payment, it might be auto-confirmed or stay pending.
-      // For now, leaving as PENDING unless auto-confirm is on?
-      // Let's check autoConfirmBooking setting
+      // Auto Confirm Logic
+      let confirmed = false;
       if (turfSettings.autoConfirmBooking && !turfSettings.requireAdvancePayment) {
           booking.status = BookingStatus.CONFIRMED;
           await transactionalEntityManager.save(Booking, booking);
+          confirmed = true;
       }
-
-      return booking;
+      
+      return { booking, razorpayOrder, advanceAmount, confirmed, turfSettings };
     });
+
+    // 2. Post-Transaction Notifications (Robustness: Failure here won't rollback booking)
+    const { booking, confirmed } = result;
+
+    /* WhatsApp removed as per request
+    if (confirmed) {
+         // Send User Confirmation
+         try {
+             const user = await this.userRepository.findOne({ where: { id: data.userId } });
+             const turf = await this.turfRepository.findOne({ where: { id: data.turfId } });
+             
+             if (user?.phone && turf) {
+                 await this.whatsAppService.sendBookingConfirmation(user.phone, {
+                     userName: user.name,
+                     turfName: turf.name,
+                     date: data.date,
+                     time: `${data.startTime.getHours()}:${data.startTime.getMinutes()}`,
+                     bookingId: booking.id
+                 });
+             }
+         } catch (e) {
+             console.error("Failed to send user confirmation whatsapp", e);
+         }
+    } else if (!result.razorpayOrder) {
+        // Send Admin Notification for new pending request (if not waiting for payment)
+        try {
+            const turf = await this.turfRepository.findOne({ where: { id: data.turfId } });
+            const user = await this.userRepository.findOne({ where: { id: data.userId } });
+            const admin = await this.adminRepository.findOne({ where: { id: turf?.ownerId } });
+
+            if (admin?.phone && turf && user) {
+                 await this.whatsAppService.sendAdminNotification(admin.phone, {
+                     turfName: turf.name,
+                     userName: user.name,
+                     date: data.date,
+                     time: `${data.startTime.getHours()}:${data.startTime.getMinutes()}`,
+                 });
+            }
+        } catch (e) {
+             console.error("Failed to send admin notification whatsapp", e);
+        }
+    }
+    */
+
+    if (result.razorpayOrder) {
+        return { ...booking, razorpayOrder: result.razorpayOrder, advanceAmount: result.advanceAmount };
+    }
+    return booking;
   }
 
   async createGuestBooking(data: CreateAdminBookingDto) {
@@ -584,7 +636,25 @@ export class BookingService {
     }
 
     booking.status = BookingStatus.CONFIRMED;
-    return await this.bookingRepository.save(booking);
+    const saveResult = await this.bookingRepository.save(booking);
+
+    // Send WhatsApp Confirmation to User
+    /* WhatsApp removed
+    const user = await this.userRepository.findOne({ where: { id: booking.userId } });
+    const turfInfo = await this.turfRepository.findOne({ where: { id: booking.turfId } });
+
+    if (user && user.phone && turfInfo) {
+        await this.whatsAppService.sendBookingConfirmation(user.phone, {
+            userName: user.name,
+            turfName: turfInfo.name,
+            date: booking.date,
+            time: `${booking.startTime.getHours()}:${booking.startTime.getMinutes()}`,
+            bookingId: booking.id
+        });
+    }
+    */
+
+    return saveResult;
   }
 
   async completeBooking(bookingId: string, adminId: string) {
@@ -611,56 +681,69 @@ export class BookingService {
   }
 
   private validateOperatingHours(startTime: Date, endTime: Date, turf: Turf, timezone: string) {
-    // Convert UTC times to Turf's timezone
     const zonedStart = toZonedTime(startTime, timezone);
     const zonedEnd = toZonedTime(endTime, timezone);
-
-    const startHour = zonedStart.getHours();
-    const startMinute = zonedStart.getMinutes();
-    const endHour = zonedEnd.getHours();
-    const endMinute = zonedEnd.getMinutes();
 
     const [openHour, openMinute] = turf.openingTime.split(":").map(Number);
     const [closeHour, closeMinute] = turf.closingTime.split(":").map(Number);
 
-    const startMinutes = startHour * 60 + startMinute;
-    const endMinutes = endHour * 60 + endMinute;
     const openMinutes = openHour * 60 + openMinute;
     const closeMinutes = closeHour * 60 + closeMinute;
 
-    // Handle overnight closing (e.g., closes at 02:00 next day)
-    // If close time is smaller than open time, it means it crosses midnight
+    // Case 1: 24-hour operation (Open = Close)
+    if (openMinutes === closeMinutes) {
+        return; // Always open
+    }
+
+    const startMinutes = zonedStart.getHours() * 60 + zonedStart.getMinutes();
+    const endMinutes = zonedEnd.getHours() * 60 + zonedEnd.getMinutes();
+
+    // Determine usage interval in minutes
+    // Note: If the booking spans across midnight, endMinutes might be smaller than startMinutes if we only look at HH:MM
+    // However, the Booking entity has full Date objects. The logic here checks if the *hours* fall within the *daily* operating window.
+    
+    // Case 2: Overnight operation (Close < Open, e.g. 18:00 - 02:00)
+    // The closed window is from Close to Open (e.g. 02:00 to 18:00)
     if (closeMinutes < openMinutes) {
-        // If start time is before close time (e.g. 01:00), it's valid (next day)
-        // If start time is after open time (e.g. 23:00), it's valid (same day)
-        // But we need to check the full range.
-        // Simplest check: if endMinutes > closeMinutes AND startMinutes < openMinutes, then invalid
-        // Wait, this logic is tricky.
-        // Let's assume standard operating hours for now, or simple midnight crossing.
-        // If crossing midnight, we can say:
-        // Valid if (start >= open) OR (end <= close)
-        // But a booking can span across midnight?
-        // Let's stick to simple logic: if start < open AND start > close (assuming close < open), then invalid.
+        // A booking is INVALID if it starts OR ends inside the closed window
+        // Closed Window: (Close, Open)
+        // Exception: Users can finish exactly at closing time or start exactly at opening time.
         
-        // Actually, if close < open, then the closed period is between close and open.
-        if (startMinutes > closeMinutes && startMinutes < openMinutes) {
-             throw new AppError(
-                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
-                400
-            );
-        }
-        
-        // Also check end time
-        if (endMinutes > closeMinutes && endMinutes < openMinutes) {
+        const isStartInClosed = startMinutes >= closeMinutes && startMinutes < openMinutes;
+        const isEndInClosed = endMinutes > closeMinutes && endMinutes <= openMinutes;
+
+        if (isStartInClosed || isEndInClosed) {
              throw new AppError(
                 `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
                 400
             );
         }
     } else {
-        // Standard day hours
-        if (startMinutes < openMinutes || endMinutes > closeMinutes) {
-            throw new AppError(
+        // Case 3: Standard operation (Open < Close, e.g. 09:00 - 21:00)
+        // Valid window: [Open, Close]
+        // Invalid: Start < Open OR End > Close
+        // Also need to handle multi-day bookings? Assuming bookings don't span > 24h generally in this context or are per-slot.
+        // If startMinutes > endMinutes in standard day, it means it crosses midnight, which is invalid for standard hours.
+        
+        if (startMinutes < openMinutes || startMinutes >= closeMinutes) {
+             throw new AppError(
+                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
+                400
+            );
+        }
+
+        // For end time, if endMinutes is 0 (midnight) and closeMinutes is 1440 (24:00 - represented as 0 in some systems?), 
+        // usually endHours is just checked.
+        // Let's protect against "After Close"
+        // Note: endMinutes could be smaller if it wrapped to next day, which is definitely invalid for standard op hours
+        
+        // Simpler check for standard day:
+        // Must be: Open <= Start < End <= Close
+        // But End could be next day? No, standard op hours implies it closes before midnight.
+        // So checking if it falls outside is sufficient.
+        
+        if (endMinutes > closeMinutes || (endMinutes < startMinutes)) { // end < start implies crossing midnight
+             throw new AppError(
                 `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
                 400
             );
