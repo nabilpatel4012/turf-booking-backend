@@ -141,11 +141,32 @@ export class PricingService {
         const ruleStart = parseInt(rule.startTime.split(":")[0]);
         const ruleEnd = parseInt(rule.endTime.split(":")[0]);
         
-        // Handle midnight crossing if needed (assuming simple daily slots for now)
-        // If ruleEnd is 00, treat as 24
-        const effectiveRuleEnd = ruleEnd === 0 ? 24 : ruleEnd;
+        // Handle overnight crossing
+        // If ruleEnd < ruleStart (e.g. 22:00 to 09:00), it means it crosses midnight.
+        // Also handle 00:00 as 24 if strictly standard day, but for comparison with hours 0-23:
+        // If ruleEnd is 0 (midnight next day), effectiveRuleEnd is 24 (if comparing with <24)
+        // strict inequality checks usually work for 0-23 hours.
 
-        return hour >= ruleStart && hour < effectiveRuleEnd;
+        // Case 1: Standard (Start < End) -> e.g. 16 to 22
+        if (ruleEnd > ruleStart) {
+             if (hour >= ruleStart && hour < ruleEnd) {
+                 return true;
+             }
+        } 
+        // Case 2: Overnight (Start > End) -> e.g. 22 to 09
+        else if (ruleEnd < ruleStart) {
+            // Valid if hour is >= Start (22, 23) OR hour < End (0, 1...8)
+             if (hour >= ruleStart || hour < ruleEnd) {
+                 return true;
+             }
+        }
+        // Case 3: 24 hours (Start = End) ? or 00 to 24?
+        // If they are equal, maybe it means always? assuming standard usage 
+        else if (ruleStart === ruleEnd) {
+             return true; 
+        }
+
+        return false;
       } catch (err) {
         console.error(`Error processing rule ${rule.id}:`, err);
         return false;
@@ -153,7 +174,13 @@ export class PricingService {
     });
 
     if (matchingRules.length === 0) {
-      // Default fallback or error? For now, throw error to ensure configuration
+      if (rules.length > 0) {
+          // Fallback: Use the highest priority active rule available
+          // Since rules are already sorted by priority DESC in calculatePrice
+          console.warn(`No pricing configured for hour ${hour}:00 on ${date.toISOString().split("T")[0]}. Using fallback rule.`);
+          return Number(rules[0].price);
+      }
+      
       throw new AppError(
         `No pricing configured for hour ${hour}:00 on ${date.toISOString().split("T")[0]}`,
         404
