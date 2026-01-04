@@ -53,4 +53,16 @@ router.patch(
   asyncHandler(turfController.updateTurfStatus)
 );
 
+router.get(
+  "/admin/:id/theme",
+  authenticateAdmin,
+  asyncHandler(turfController.getTurfTheme)
+);
+
+router.put(
+  "/admin/:id/theme",
+  authenticateAdmin,
+  asyncHandler(turfController.updateTurfTheme)
+);
+
 export default router;

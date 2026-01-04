@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   JoinColumn,
   Index,
 } from "typeorm";
@@ -13,6 +14,21 @@ import { Admin } from "./admin.entity";
 import { Booking } from "./booking.entity";
 import { Review } from "./review.entity";
 import { Pricing } from "./pricing.entity";
+import { VenueTheme } from "./venue-theme.entity";
+
+export enum VenueType {
+  TURF = "turf",
+  BADMINTON = "badminton",
+  PICKLEBALL = "pickleball",
+  TABLE_TENNIS = "table_tennis",
+}
+
+export enum VenueShape {
+  RECTANGLE = "rectangle",
+  SQUARE = "square",
+  OVAL = "oval",
+  CIRCLE = "circle",
+}
 
 export enum TurfStatus {
   ACTIVE = "active",
@@ -92,6 +108,26 @@ export class Turf {
   @OneToMany(() => Review, (review) => review.turf)
   reviews: Review[];
 
+  @Column({
+    type: "enum",
+    enum: VenueType,
+    default: VenueType.TURF,
+  })
+  venueType: VenueType;
+
+  @Column({
+    type: "enum",
+    enum: VenueShape,
+    default: VenueShape.RECTANGLE,
+  })
+  shape: VenueShape;
+
+  @Column({ type: "varchar", nullable: true })
+  size: string;
+
   @OneToMany(() => Pricing, (pricing) => pricing.turf)
   pricing: Pricing[];
+
+  @OneToOne(() => VenueTheme, (theme) => theme.turf, { cascade: true })
+  theme: VenueTheme;
 }

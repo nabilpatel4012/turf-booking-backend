@@ -80,6 +80,9 @@ export class TurfController {
       amenities,
       openingTime,
       closingTime,
+      venueType,
+      shape,
+      size,
     } = req.body;
 
     const turf = await this.turfService.createTurf(adminId, {
@@ -96,6 +99,9 @@ export class TurfController {
       amenities,
       openingTime,
       closingTime,
+      venueType,
+      shape,
+      size,
     });
 
     res.status(201).json({
@@ -129,6 +135,10 @@ export class TurfController {
       status,
       openingTime,
       closingTime,
+      venueType,
+      shape,
+      size,
+      theme,
     } = req.body;
 
     const turf = await this.turfService.updateTurf(id, adminId, {
@@ -146,6 +156,10 @@ export class TurfController {
       status,
       openingTime,
       closingTime,
+      venueType,
+      shape,
+      size,
+      theme,
     });
 
     res.json({
@@ -205,6 +219,51 @@ export class TurfController {
       success: true,
       message: "Turf status updated successfully",
       data: turf,
+    });
+  };
+
+  // Get turf theme
+  getTurfTheme = async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+
+    const theme = await this.turfService.getTurfTheme(id);
+
+    res.json({
+      success: true,
+      data: theme,
+    });
+  };
+
+  // Update turf theme (admin only - must be owner)
+  updateTurfTheme = async (req: AuthRequest, res: Response) => {
+    const adminId = req.user?.id;
+    const { id } = req.params;
+    const {
+        preset,
+        primaryColor,
+        secondaryColor,
+        backgroundColor,
+        layout,
+        font
+    } = req.body;
+
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const theme = await this.turfService.updateTurfTheme(id, adminId, {
+        preset,
+        primaryColor,
+        secondaryColor,
+        backgroundColor,
+        layout,
+        font
+    });
+
+    res.json({
+      success: true,
+      message: "Venue theme updated successfully",
+      data: theme,
     });
   };
 }
