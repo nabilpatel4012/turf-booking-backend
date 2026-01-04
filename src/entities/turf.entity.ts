@@ -64,6 +64,9 @@ export class Turf {
   @Column({ type: "varchar", nullable: true })
   zipCode: string;
 
+  @Column({ type: "text", nullable: true })
+  googleMapUrl: string;
+
   @Column({ type: "decimal", precision: 10, scale: 8, nullable: true })
   latitude: number;
 
@@ -86,10 +89,10 @@ export class Turf {
   })
   status: TurfStatus;
 
-  @Column({ name: "opening_time", type: "time", default: "00:00:00" })
+  @Column({ name: "opening_time", type: "time", nullable: true, default: "00:00:00" })
   openingTime: string;
 
-  @Column({ name: "closing_time", type: "time", default: "23:59:59" })
+  @Column({ name: "closing_time", type: "time", nullable: true, default: "23:59:59" })
   closingTime: string;
 
   @CreateDateColumn({ name: "created_at" })

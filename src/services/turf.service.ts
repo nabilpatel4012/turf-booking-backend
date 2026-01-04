@@ -12,6 +12,7 @@ export interface CreateTurfDto {
   city?: string;
   state?: string;
   zipCode?: string;
+  googleMapUrl?: string; // New field
   latitude?: number;
   longitude?: number;
   phone?: string;
@@ -31,6 +32,7 @@ export interface UpdateTurfDto {
   city?: string;
   state?: string;
   zipCode?: string;
+  googleMapUrl?: string;
   latitude?: number;
   longitude?: number;
   phone?: string;
@@ -210,7 +212,7 @@ export class TurfService {
         // Create new theme
         const newTheme = this.themeRepository.create({
           ...data.theme,
-          turfId: turf.id,
+          turf: turf,
         });
         await this.themeRepository.save(newTheme);
       }
@@ -314,7 +316,7 @@ export class TurfService {
     } else {
         theme = this.themeRepository.create({
             ...data,
-            turfId
+            turf: turf
         });
         await this.themeRepository.save(theme);
     }

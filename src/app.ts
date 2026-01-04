@@ -20,6 +20,8 @@ const corsOptions = {
     "http://localhost:8080",
     "https://gomyturf.nexpictora.com",
     "https://gomyturf.pages.dev",
+    "https://*.nexsports.in",
+    "https://nexsports.in",
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
