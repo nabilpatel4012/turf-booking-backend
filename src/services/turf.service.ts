@@ -2,8 +2,6 @@ import { Repository } from "typeorm";
 import { Turf, TurfStatus, VenueShape, VenueType } from "../entities/turf.entity";
 import { AppDataSource } from "../db/data.source";
 import { AppError } from "../middleware/error.middleware";
-import { VenueTheme } from "../entities/venue-theme.entity";
-import { UpdateVenueThemeDto } from "../dtos/venue-theme.dto";
 
 export interface CreateTurfDto {
   name: string;
@@ -12,10 +10,11 @@ export interface CreateTurfDto {
   city?: string;
   state?: string;
   zipCode?: string;
-  googleMapUrl?: string; // New field
+  googleMapUrl?: string;
   latitude?: number;
   longitude?: number;
   phone?: string;
+  logo?: string; // Added logo
   images?: string[];
   amenities?: string[];
   openingTime?: string;
@@ -36,6 +35,7 @@ export interface UpdateTurfDto {
   latitude?: number;
   longitude?: number;
   phone?: string;
+  logo?: string; // Added logo
   images?: string[];
   amenities?: string[];
   status?: TurfStatus;
@@ -44,16 +44,13 @@ export interface UpdateTurfDto {
   venueType?: VenueType;
   shape?: VenueShape;
   size?: string;
-  theme?: Partial<VenueTheme>;
 }
 
 export class TurfService {
   private turfRepository: Repository<Turf>;
-  private themeRepository: Repository<VenueTheme>;
 
   constructor() {
     this.turfRepository = AppDataSource.getRepository(Turf);
-    this.themeRepository = AppDataSource.getRepository(VenueTheme);
   }
 
   async getAllTurfs(filters?: {
@@ -64,7 +61,6 @@ export class TurfService {
     const queryBuilder = this.turfRepository
       .createQueryBuilder("turf")
       .leftJoinAndSelect("turf.owner", "owner")
-      .leftJoinAndSelect("turf.theme", "theme")
       .select([
         "turf.id",
         "turf.name",
@@ -76,6 +72,7 @@ export class TurfService {
         "turf.latitude",
         "turf.longitude",
         "turf.phone",
+        "turf.logo",
         "turf.images",
         "turf.amenities",
         "turf.status",
@@ -87,7 +84,6 @@ export class TurfService {
         "turf.createdAt",
         "owner.id",
         "owner.name",
-        "theme",
       ]);
 
     // Apply filters
@@ -123,7 +119,6 @@ export class TurfService {
     const queryBuilder = this.turfRepository
       .createQueryBuilder("turf")
       .leftJoinAndSelect("turf.owner", "owner")
-      .leftJoinAndSelect("turf.theme", "theme")
       .select([
         "turf.id",
         "turf.name",
@@ -135,6 +130,7 @@ export class TurfService {
         "turf.latitude",
         "turf.longitude",
         "turf.phone",
+        "turf.logo",
         "turf.images",
         "turf.amenities",
         "turf.status",
@@ -149,7 +145,6 @@ export class TurfService {
         "owner.name",
         "owner.email",
         "owner.phone",
-        "theme",
       ])
       .where("turf.id = :id", { id });
 
@@ -171,7 +166,6 @@ export class TurfService {
   async getTurfsByOwnerId(ownerId: string) {
     const turfs = await this.turfRepository.find({
       where: { ownerId },
-      relations: ["theme"],
       order: { createdAt: "DESC" },
     });
 
@@ -193,7 +187,6 @@ export class TurfService {
   async updateTurf(id: string, ownerId: string, data: UpdateTurfDto) {
     const turf = await this.turfRepository.findOne({
       where: { id, ownerId },
-      relations: ["theme"],
     });
 
     if (!turf) {
@@ -201,22 +194,6 @@ export class TurfService {
         "Turf not found or you don't have permission to update it",
         404
       );
-    }
-
-    // Handle Theme update
-    if (data.theme) {
-      if (turf.theme) {
-        // Update existing theme
-        await this.themeRepository.update(turf.theme.id, data.theme);
-      } else {
-        // Create new theme
-        const newTheme = this.themeRepository.create({
-          ...data.theme,
-          turf: turf,
-        });
-        await this.themeRepository.save(newTheme);
-      }
-      delete data.theme; // Remove from data to avoid overwriting turf properties
     }
 
     // Update only provided fields
@@ -285,42 +262,5 @@ export class TurfService {
     await this.turfRepository.save(turf);
 
     return turf;
-  }
-
-  async getTurfTheme(turfId: string) {
-    const theme = await this.themeRepository.findOne({
-      where: { turfId },
-    });
-    
-    // Return default or null if not found, or create a default structure
-    // For now, let's return what we found or null
-    return theme;
-  }
-
-  async updateTurfTheme(turfId: string, ownerId: string, data: UpdateVenueThemeDto) {
-    // Verify ownership first
-    const turf = await this.turfRepository.findOne({
-        where: { id: turfId, ownerId }
-    });
-
-    if (!turf) {
-        throw new AppError("Venue not found or unauthorized", 404);
-    }
-
-    let theme = await this.themeRepository.findOne({
-        where: { turfId }
-    });
-
-    if (theme) {
-        await this.themeRepository.update(theme.id, data);
-    } else {
-        theme = this.themeRepository.create({
-            ...data,
-            turf: turf
-        });
-        await this.themeRepository.save(theme);
-    }
-
-    return this.themeRepository.findOne({ where: { turfId } });
   }
 }

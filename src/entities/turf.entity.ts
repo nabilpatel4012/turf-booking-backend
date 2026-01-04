@@ -14,7 +14,8 @@ import { Admin } from "./admin.entity";
 import { Booking } from "./booking.entity";
 import { Review } from "./review.entity";
 import { Pricing } from "./pricing.entity";
-import { VenueTheme } from "./venue-theme.entity";
+
+
 
 export enum VenueType {
   TURF = "turf",
@@ -131,6 +132,6 @@ export class Turf {
   @OneToMany(() => Pricing, (pricing) => pricing.turf)
   pricing: Pricing[];
 
-  @OneToOne(() => VenueTheme, (theme) => theme.turf, { cascade: true })
-  theme: VenueTheme;
+  @Column({ type: "text", nullable: true })
+  logo: string;
 }

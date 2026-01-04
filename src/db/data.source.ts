@@ -14,7 +14,6 @@ import { TurfSetting } from "../entities/turf-setting.entity";
 import { OwnerSetting } from "../entities/owner-setting.entity";
 import { TwoFactorAuth } from "../entities/two-factor.entity";
 import { BookingView } from "../entities/booking-view.entity";
-import { VenueTheme } from "../entities/venue-theme.entity";
 config();
 
 export const AppDataSource = new DataSource({
@@ -41,7 +40,6 @@ export const AppDataSource = new DataSource({
     OwnerSetting,
     TwoFactorAuth,
     BookingView,
-    VenueTheme,
   ],
   synchronize: false, // Never use in production
   logging: process.env.NODE_ENV === "development",

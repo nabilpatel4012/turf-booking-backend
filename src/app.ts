@@ -9,6 +9,7 @@ import pricingRoutes from "./routes/pricing.routes";
 import settingRoutes from "./routes/setting.routes";
 import adminRoutes from "./routes/admin.routes";
 import publicRoutes from "./routes/public.routes";
+import uploadRoutes from "./routes/upload.routes";
 import { errorHandler } from "./middleware/error.middleware";
 import "reflect-metadata";
 
@@ -20,8 +21,7 @@ const corsOptions = {
     "http://localhost:8080",
     "https://gomyturf.nexpictora.com",
     "https://gomyturf.pages.dev",
-    "https://*.nexsports.in",
-    "https://nexsports.in",
+    "https://admin.nexsports.in"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -46,6 +46,7 @@ app.use("/api/pricing", pricingRoutes);
 app.use("/api/settings", settingRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", publicRoutes);
+app.use("/api", uploadRoutes);
 
 app.use(errorHandler);
 
