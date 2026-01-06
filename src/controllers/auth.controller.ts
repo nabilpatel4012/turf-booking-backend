@@ -46,7 +46,7 @@ export class AuthController {
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: "strict",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     });
 
@@ -72,7 +72,7 @@ export class AuthController {
     res.cookie("accessToken", result.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: "strict",
       maxAge: 15 * 60 * 1000,
     });
 
@@ -80,7 +80,7 @@ export class AuthController {
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: "strict",
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
@@ -108,7 +108,7 @@ export class AuthController {
     res.cookie("accessToken", result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: "strict",
       maxAge: 15 * 60 * 1000,
     });
 
@@ -116,7 +116,7 @@ export class AuthController {
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      sameSite: "strict",
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
@@ -145,7 +145,7 @@ export class AuthController {
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "none", //TODO: Make it strict later
+      sameSite: "strict", //TODO: Make it strict later
       maxAge: 30 * 24 * 60 * 60 * 1000,
     });
 
