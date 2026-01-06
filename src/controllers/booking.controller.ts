@@ -26,9 +26,12 @@ export class BookingController {
     const role = req.user!.role;
     const { turfId, date, startTime, endTime } = req.body;
 
+    console.log("[BookingController] createBooking request received", { userId, role, body: req.body });
+
     let booking;
 
     if (role === AuthRole.ADMIN) {
+      console.log("[BookingController] Processing Admin booking");
       // If Admin is booking, ensure they have a User account (Shadow User)
       const admin = await this.adminRepository.findOne({ where: { id: userId } });
       if (!admin) {
@@ -63,6 +66,7 @@ export class BookingController {
         createdByRole: role,
       });
     } else {
+      console.log("[BookingController] Processing User booking");
       // User booking
       booking = await this.bookingService.createBookingForUser({
         turfId,
