@@ -330,7 +330,7 @@ export class SettingController {
       // Payment
       ...(payment && {
         requireAdvancePayment: payment.requireAdvance,
-        advancePaymentPercentage: payment.advancePercentage,
+        advancePaymentAmount: payment.advanceAmount,
         refundEnabled: payment.refundEnabled,
         refundPercentage: payment.refundPercentage,
       }),
