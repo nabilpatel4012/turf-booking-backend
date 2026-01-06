@@ -17,9 +17,9 @@ const app = express();
 
 const corsOptions = {
   origin: [
-    process.env.FRONTEND_URL || "http://localhost:3001",
+    "http://localhost:3001",
     "http://localhost:8080",
-    "https://gomyturf.nexpictora.com",
+    "https://app.nexsports.in",
     "https://gomyturf.pages.dev",
     "https://admin.nexsports.in"
   ],
