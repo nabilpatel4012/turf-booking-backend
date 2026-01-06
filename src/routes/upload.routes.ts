@@ -5,7 +5,7 @@ import { authenticateAdmin } from "../middleware/auth.middleware";
 const router = Router();
 const uploadController = new UploadController();
 
-// Single file upload
+// Single file upload (Generic)
 router.post(
   "/upload",
   authenticateAdmin,
@@ -13,12 +13,20 @@ router.post(
   uploadController.uploadImage
 );
 
-// Multiple file upload
+// Multiple file upload (Generic)
 router.post(
     "/upload-multiple",
     authenticateAdmin,
     uploadController.uploadMiddlewareMultiple,
     uploadController.uploadMultipleImages
+);
+
+// Venue specific upload
+router.post(
+  "/venues/:venueId/upload",
+  authenticateAdmin,
+  uploadController.uploadMiddleware,
+  uploadController.uploadVenueImage
 );
 
 export default router;

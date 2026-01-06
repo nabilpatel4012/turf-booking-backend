@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { CloudflareService } from "../services/cloudflare.service";
+import { R2Service } from "../services/r2.service";
 import multer from "multer";
 
 const upload = multer({
@@ -17,10 +17,10 @@ const upload = multer({
 });
 
 export class UploadController {
-  private cloudflareService: CloudflareService;
+  private r2Service: R2Service;
 
   constructor() {
-    this.cloudflareService = new CloudflareService();
+    this.r2Service = new R2Service();
   }
 
   // Middleware getter
@@ -32,6 +32,7 @@ export class UploadController {
       return upload.array("files", 10); // Max 10 files at once
   }
 
+  // Generic upload (legacy support or non-venue specific)
   uploadImage = async (req: Request, res: Response) => {
     try {
       if (!req.file) {
@@ -39,10 +40,11 @@ export class UploadController {
       }
 
       const file = req.file;
-      const imageUrl = await this.cloudflareService.uploadImage(
-        file.buffer,
-        file.originalname
-      );
+      const imageUrl = await this.r2Service.uploadImage({
+        file: file.buffer,
+        fileName: file.originalname,
+        contentType: file.mimetype
+      });
 
       return res.status(200).json({
         success: true,
@@ -56,7 +58,7 @@ export class UploadController {
     }
   };
   
-    uploadMultipleImages = async (req: Request, res: Response) => {
+  uploadMultipleImages = async (req: Request, res: Response) => {
     try {
       if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
         return res.status(400).json({ error: "No files uploaded" });
@@ -64,7 +66,11 @@ export class UploadController {
 
       const files = req.files as Express.Multer.File[];
       const uploadPromises = files.map(file => 
-          this.cloudflareService.uploadImage(file.buffer, file.originalname)
+          this.r2Service.uploadImage({
+            file: file.buffer,
+            fileName: file.originalname,
+            contentType: file.mimetype
+          })
       );
 
       const imageUrls = await Promise.all(uploadPromises);
@@ -80,4 +86,35 @@ export class UploadController {
       });
     }
   };
+
+  // New method for Venue specific uploads
+  uploadVenueImage = async (req: Request, res: Response) => {
+    try {
+      const { venueId } = req.params;
+      const { isLogo } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      const file = req.file;
+      const imageUrl = await this.r2Service.uploadImage({
+        venueId,
+        file: file.buffer,
+        fileName: file.originalname,
+        contentType: file.mimetype,
+        isLogo: isLogo === 'true',
+      });
+
+      return res.status(200).json({
+        success: true,
+        url: imageUrl,
+      });
+    } catch (error) {
+       console.error("Venue Upload error:", error);
+       return res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to upload venue image",
+      });
+    }
+  }
 }
