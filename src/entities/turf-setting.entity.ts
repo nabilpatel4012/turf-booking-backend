@@ -69,8 +69,8 @@ export class TurfSetting {
   @Column({ name: "require_advance_payment", type: "boolean", default: false })
   requireAdvancePayment: boolean;
 
-  @Column({ name: "advance_payment_percentage", type: "int", default: 0 })
-  advancePaymentPercentage: number;
+  @Column({ name: "advance_payment_amount", type: "int", default: 0 })
+  advancePaymentAmount: number;
 
   @Column({ name: "refund_enabled", type: "boolean", default: true })
   refundEnabled: boolean;

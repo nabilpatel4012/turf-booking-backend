@@ -23,7 +23,7 @@ interface TurfSettingUpdate {
 
   // Payment Settings
   requireAdvancePayment?: boolean;
-  advancePaymentPercentage?: number;
+  advancePaymentAmount?: number;
   refundEnabled?: boolean;
   refundPercentage?: number;
 
@@ -87,14 +87,11 @@ export class TurfSettingService {
 
     let settings = await this.getTurfSettings(turfId);
 
-    // Validate percentage fields
-    if (updates.advancePaymentPercentage !== undefined) {
-      if (
-        updates.advancePaymentPercentage < 0 ||
-        updates.advancePaymentPercentage > 100
-      ) {
+    // Validate amount fields
+    if (updates.advancePaymentAmount !== undefined) {
+      if (updates.advancePaymentAmount < 0) {
         throw new AppError(
-          "Advance payment percentage must be between 0 and 100",
+          "Advance payment amount must be non-negative",
           400
         );
       }
@@ -165,7 +162,7 @@ export class TurfSettingService {
       },
       payment: {
         requireAdvance: settings.requireAdvancePayment,
-        advancePercentage: settings.advancePaymentPercentage,
+        advanceAmount: settings.advancePaymentAmount,
         refundEnabled: settings.refundEnabled,
         refundPercentage: settings.refundPercentage,
       },

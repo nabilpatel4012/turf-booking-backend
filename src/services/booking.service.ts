@@ -199,13 +199,26 @@ export class BookingService {
       let advanceAmount = 0;
 
       if (turfSettings.requireAdvancePayment) {
-        advanceAmount = (booking.price * turfSettings.advancePaymentPercentage) / 100;
+        advanceAmount = turfSettings.advancePaymentAmount;
         
-        if (advanceAmount > 0) {
+        // Add 2.5% Platform Fee
+        const platformFee = Math.ceil(advanceAmount * 0.025);
+        const totalAmount = advanceAmount + platformFee;
+        
+        if (totalAmount > 0) {
           try {
+             // Generate Unique Receipt ID
+             const receiptId = `R_${data.turfId.slice(0, 8)}_${Date.now()}`;
+             
              razorpayOrder = await this.paymentService.createOrder(
-              advanceAmount,
-              booking.id
+              totalAmount,
+              receiptId,
+              {
+                turfId: data.turfId,
+                bookingId: booking.id,
+                advanceAmount: advanceAmount,
+                platformFee: platformFee
+              }
             );
             booking.orderId = razorpayOrder.id;
             await transactionalEntityManager.save(Booking, booking);
@@ -270,7 +283,13 @@ export class BookingService {
     */
 
     if (result.razorpayOrder) {
-        return { ...booking, razorpayOrder: result.razorpayOrder, advanceAmount: result.advanceAmount };
+        return { 
+          ...booking, 
+          razorpayOrder: result.razorpayOrder, 
+          advanceAmount: result.advanceAmount,
+          // We can optionally return the breakdown here if needed by frontend immediately,
+          // though usually frontend calculates it for display before calling createBooking.
+        };
     }
     return booking;
   }

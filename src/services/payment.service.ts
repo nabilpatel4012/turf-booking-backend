@@ -19,12 +19,13 @@ export class PaymentService {
     });
   }
 
-  async createOrder(amount: number, receipt: string) {
+  async createOrder(amount: number, receipt: string, notes?: Record<string, string | number>) {
     try {
       const options = {
         amount: Math.round(amount * 100), // amount in the smallest currency unit (paise)
         currency: "INR",
         receipt: receipt,
+        notes: notes,
       };
       const order = await this.razorpay.orders.create(options);
       return order;
