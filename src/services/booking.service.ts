@@ -97,6 +97,7 @@ export class BookingService {
 
     // 2. Check if bookings are disabled (skip for admin)
     const turfSettings = await this.turfSettingService.getTurfSettings(turfId);
+    console.log("[BookingService] got the turf settings in _createBookingInternal", { turfSettings });
     const timezone = turfSettings.timezone || "Asia/Kolkata";
 
     if (createdByRole !== AuthRole.ADMIN) {
