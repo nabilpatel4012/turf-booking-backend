@@ -1,5 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
 
 // R2 Configuration
 const R2_CONFIG = {
@@ -103,27 +103,5 @@ export class R2Service {
     }
   }
 
-  /**
-   * Generate presigned URL (Optional helper if needed later)
-   */
-  async generatePresignedUploadUrl(
-    fileName: string,
-    contentType: string,
-    venueId?: string,
-    isLogo: boolean = false
-  ): Promise<{ uploadUrl: string; publicUrl: string; filePath: string }> {
-      const filePath = this.generateFilePath(fileName, venueId, isLogo);
-
-      const command = new PutObjectCommand({
-        Bucket: R2_CONFIG.bucketName,
-        Key: filePath,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000',
-      });
-
-      const uploadUrl = await getSignedUrl(this.r2Client, command, { expiresIn: 3600 });
-      const publicUrl = `${R2_CONFIG.publicUrl}/${filePath}`;
-
-      return { uploadUrl, publicUrl, filePath };
-  }
+  // Removed generatePresignedUploadUrl as we are doing direct server-side upload only.
 }
