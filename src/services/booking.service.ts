@@ -119,8 +119,7 @@ export class BookingService {
       );
     }
 
-    // 4. Validate operating hours
-    this.validateOperatingHours(startTime, endTime, turf, timezone);
+
 
     // 5. Check for overlaps
     const overlapCount = await transactionalEntityManager
@@ -699,76 +698,7 @@ export class BookingService {
     return await this.bookingRepository.save(booking);
   }
 
-  private validateOperatingHours(startTime: Date, endTime: Date, turf: Turf, timezone: string) {
-    const zonedStart = toZonedTime(startTime, timezone);
-    const zonedEnd = toZonedTime(endTime, timezone);
 
-    const [openHour, openMinute] = turf.openingTime.split(":").map(Number);
-    const [closeHour, closeMinute] = turf.closingTime.split(":").map(Number);
-
-    const openMinutes = openHour * 60 + openMinute;
-    const closeMinutes = closeHour * 60 + closeMinute;
-
-    // Case 1: 24-hour operation (Open = Close)
-    if (openMinutes === closeMinutes) {
-        return; // Always open
-    }
-
-    const startMinutes = zonedStart.getHours() * 60 + zonedStart.getMinutes();
-    const endMinutes = zonedEnd.getHours() * 60 + zonedEnd.getMinutes();
-
-    // Determine usage interval in minutes
-    // Note: If the booking spans across midnight, endMinutes might be smaller than startMinutes if we only look at HH:MM
-    // However, the Booking entity has full Date objects. The logic here checks if the *hours* fall within the *daily* operating window.
-    
-    // Case 2: Overnight operation (Close < Open, e.g. 18:00 - 02:00)
-    // The closed window is from Close to Open (e.g. 02:00 to 18:00)
-    if (closeMinutes < openMinutes) {
-        // A booking is INVALID if it starts OR ends inside the closed window
-        // Closed Window: (Close, Open)
-        // Exception: Users can finish exactly at closing time or start exactly at opening time.
-        
-        const isStartInClosed = startMinutes >= closeMinutes && startMinutes < openMinutes;
-        const isEndInClosed = endMinutes > closeMinutes && endMinutes <= openMinutes;
-
-        if (isStartInClosed || isEndInClosed) {
-             throw new AppError(
-                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
-                400
-            );
-        }
-    } else {
-        // Case 3: Standard operation (Open < Close, e.g. 09:00 - 21:00)
-        // Valid window: [Open, Close]
-        // Invalid: Start < Open OR End > Close
-        // Also need to handle multi-day bookings? Assuming bookings don't span > 24h generally in this context or are per-slot.
-        // If startMinutes > endMinutes in standard day, it means it crosses midnight, which is invalid for standard hours.
-        
-        if (startMinutes < openMinutes || startMinutes >= closeMinutes) {
-             throw new AppError(
-                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
-                400
-            );
-        }
-
-        // For end time, if endMinutes is 0 (midnight) and closeMinutes is 1440 (24:00 - represented as 0 in some systems?), 
-        // usually endHours is just checked.
-        // Let's protect against "After Close"
-        // Note: endMinutes could be smaller if it wrapped to next day, which is definitely invalid for standard op hours
-        
-        // Simpler check for standard day:
-        // Must be: Open <= Start < End <= Close
-        // But End could be next day? No, standard op hours implies it closes before midnight.
-        // So checking if it falls outside is sufficient.
-        
-        if (endMinutes > closeMinutes || (endMinutes < startMinutes)) { // end < start implies crossing midnight
-             throw new AppError(
-                `Booking must be within operating hours: ${turf.openingTime} - ${turf.closingTime}`,
-                400
-            );
-        }
-    }
-  }
 
   private async checkOverlap(
     turfId: string,
