@@ -125,13 +125,14 @@ export class BookingService {
     const overlapCount = await transactionalEntityManager
       .createQueryBuilder(Booking, "booking")
       .where("booking.turfId = :turfId", { turfId })
-      .andWhere("booking.status IN (:...statuses)", {
-        statuses: [
-          BookingStatus.PENDING,
-          BookingStatus.CONFIRMED,
-          BookingStatus.ACTIVE,
-        ],
-      })
+      .andWhere(
+        "(booking.status IN (:...activeStatuses) OR (booking.status = :pendingStatus AND booking.createdAt > :expirationTime))",
+        {
+          activeStatuses: [BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+          pendingStatus: BookingStatus.PENDING,
+          expirationTime: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes expiration
+        }
+      )
       .andWhere("booking.date = :date", { date })
       .andWhere("booking.startTime < :endTime", { endTime })
       .andWhere("booking.endTime > :startTime", { startTime })
@@ -709,13 +710,14 @@ export class BookingService {
     const count = await this.bookingRepository
       .createQueryBuilder("booking")
       .where("booking.turfId = :turfId", { turfId })
-      .andWhere("booking.status IN (:...statuses)", {
-        statuses: [
-          BookingStatus.PENDING,
-          BookingStatus.CONFIRMED,
-          BookingStatus.ACTIVE,
-        ],
-      })
+      .andWhere(
+        "(booking.status IN (:...activeStatuses) OR (booking.status = :pendingStatus AND booking.createdAt > :expirationTime))",
+        {
+          activeStatuses: [BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+          pendingStatus: BookingStatus.PENDING,
+          expirationTime: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes expiration
+        }
+      )
       .andWhere("booking.date = :date", { date })
       .andWhere("booking.startTime < :endTime", { endTime })
       .andWhere("booking.endTime > :startTime", { startTime })
