@@ -35,6 +35,7 @@ router.post(
 router.get("/verify-qr", authenticate, bookingController.verifyQR);
 router.get("/turf/:turfId", bookingController.getBookingsByTurfId);
 router.get("/", authenticate, asyncHandler(bookingController.getBookings));
+router.get("/v2", authenticate, asyncHandler(bookingController.getBookingsV2));
 
 router.get(
   "/:id",

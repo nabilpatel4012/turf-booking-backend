@@ -29,6 +29,16 @@ export class TurfController {
     });
   };
 
+  getAllTurfsV2 = async (req: AuthRequest, res: Response) => {
+    const turfs = await this.turfService.getAllTurfsV2(req.query);
+
+    res.json({
+      success: true,
+      count: turfs.length,
+      data: turfs,
+    });
+  };
+
   // Get turf by ID (accessible by users)
   getTurfById = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;

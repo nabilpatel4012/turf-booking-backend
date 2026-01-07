@@ -67,6 +67,21 @@ export class Booking {
   @Column({ name: "order_id", type: "text", nullable: true })
   orderId: string;
 
+  @Column({ name: "paid_amount", type: "decimal", precision: 10, scale: 2, nullable: true })
+  paidAmount: number;
+
+  @Column({ name: "invoice_id", type: "text", nullable: true })
+  invoiceId: string;
+
+  @Column({ name: "payment_info", type: "jsonb", nullable: true })
+  paymentInfo: any;
+
+  @Column({ name: "app_id", type: "text", nullable: true })
+  appId: string;
+
+  @Column({ name: "app_name", type: "text", nullable: true })
+  appName: string;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

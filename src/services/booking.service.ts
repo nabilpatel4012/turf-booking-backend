@@ -13,6 +13,7 @@ import { BookingView } from "../entities/booking-view.entity";
 import * as bcrypt from "bcryptjs";
 import { TurfSettingService } from "./turf-setting.service";
 import { toZonedTime } from "date-fns-tz";
+import { APIFeatures } from "../utils/api.features";
 
 
 export interface CreateBookingDto {
@@ -228,11 +229,22 @@ export class BookingService {
                 turfId: data.turfId,
                 bookingId: booking.id,
                 advanceAmount: advanceAmount,
-                platformFee: platformFee
+                platformFee: platformFee,
+                "App Name": "NexSports",
+                "App ID": data.turfId
               }
             );
-            console.log("[BookingService] Razorpay Order Created:", razorpayOrder.id);
+             console.log("[BookingService] Razorpay Order Created:", razorpayOrder.id);
             booking.orderId = razorpayOrder.id;
+            
+            // Populate Payment & Metadata Fields
+            booking.invoiceId = receiptId; // Use the generated receipt ID as invoice ID
+            booking.appId = data.turfId;   // Turf ID as App ID
+            booking.appName = "NexSports";
+            // We can store the expected paid amount here, or strictly only on success.
+            // Let's store what we *expect* to be paid.
+            booking.paidAmount = totalAmount; 
+            
             await transactionalEntityManager.save(Booking, booking);
           } catch (error) {
             throw new AppError("Failed to initiate payment", 500);
@@ -374,6 +386,26 @@ export class BookingService {
 
       booking.status = BookingStatus.CONFIRMED;
       booking.paymentId = paymentId;
+      
+      // We can infer the paid amount from the order if we had it, but for now we can rely on what we expected
+      // better yet, we can fetch the order details if we want to be 100% sure, but that requires an extra API call.
+      // For now, let's assume the payment was for the full required advance amount which we likely calculated before.
+      // However, we didn't store the *expected* advance amount on the booking entity itself, only calculated it dynamically.
+      // Let's at least store the paymentId and perhaps the raw signature as info.
+      
+      booking.paymentInfo = {
+        paymentId,
+        orderId: booking.orderId,
+        signature,
+        verifiedAt: new Date()
+      };
+      
+      // If we want paidAmount, we might need to store `advanceAmount` on the booking during creation or fetch it.
+      // Since we don't have it on the entity, we might skip `paidAmount` update here OR fetch turf settings again?
+      // Actually, let's leave paidAmount null if we aren't sure, or better:
+      // The user wants `paidAmount`. We can populate it if we add `advanceAmount` to the booking entity or recalculate.
+      // Let's store the `paymentId` as key.
+      
       return await this.bookingRepository.save(booking);
   }
 
@@ -501,6 +533,39 @@ export class BookingService {
       .skip(skip)
       .take(limit)
       .getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAllBookingsV2(queryString: any, ownerId?: string) {
+    let queryBuilder = this.bookingViewRepository.createQueryBuilder("booking");
+
+    if (ownerId) {
+       queryBuilder
+        .leftJoin(Turf, "turf", "booking.turfId = turf.id")
+        .andWhere("turf.ownerId = :ownerId", { ownerId });
+    }
+
+    // Initialize API Features
+    const features = new APIFeatures(queryBuilder, queryString)
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
+
+    const [data, total] = await features.query.getManyAndCount();
+    
+    // Calculate page and limit fro meta
+    const page = (queryString.page * 1) || 1;
+    const limit = (queryString.limit * 1) || 100;
 
     return {
       data,

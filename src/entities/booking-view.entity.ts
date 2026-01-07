@@ -20,6 +20,11 @@ import { BookingStatus } from "./booking.entity";
       b.order_id,
       b.created_at,
       b.updated_at,
+      b.paid_amount,
+      b.invoice_id,
+      b.payment_info,
+      b.app_id,
+      b.app_name,
       t.name AS turf_name,
       u.name AS user_name,
       u.phone AS user_phone,
@@ -75,6 +80,21 @@ export class BookingView {
 
   @ViewColumn({ name: "updated_at" })
   updatedAt: Date;
+
+  @ViewColumn({ name: "paid_amount" })
+  paidAmount: number;
+
+  @ViewColumn({ name: "invoice_id" })
+  invoiceId: string;
+
+  @ViewColumn({ name: "payment_info" })
+  paymentInfo: any;
+
+  @ViewColumn({ name: "app_id" })
+  appId: string;
+
+  @ViewColumn({ name: "app_name" })
+  appName: string;
 
   @ViewColumn({ name: "turf_name" })
   turfName: string;

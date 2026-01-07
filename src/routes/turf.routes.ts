@@ -13,6 +13,7 @@ const turfController = new TurfController();
 
 // Public routes (accessible by both users and guests)
 router.get("/", asyncHandler(turfController.getAllTurfs));
+router.get("/v2", asyncHandler(turfController.getAllTurfsV2));
 router.get("/:id", asyncHandler(turfController.getTurfById));
 
 // Admin routes - Turf management

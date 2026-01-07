@@ -2,6 +2,7 @@ import { Repository } from "typeorm";
 import { Turf, TurfStatus, VenueShape, VenueType } from "../entities/turf.entity";
 import { AppDataSource } from "../db/data.source";
 import { AppError } from "../middleware/error.middleware";
+import { APIFeatures } from "../utils/api.features";
 
 export interface CreateTurfDto {
   name: string;
@@ -112,6 +113,25 @@ export class TurfService {
 
     const turfs = await queryBuilder.getMany();
 
+    return turfs;
+  }
+
+  async getAllTurfsV2(queryString: any) {
+    const queryBuilder = this.turfRepository
+      .createQueryBuilder("turf")
+      .leftJoinAndSelect("turf.owner", "owner");
+
+    if (!queryString.status) {
+         queryString.status = TurfStatus.ACTIVE;
+    }
+
+    const features = new APIFeatures(queryBuilder, queryString)
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
+
+    const turfs = await features.query.getMany();
     return turfs;
   }
 

@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import hpp from "hpp";
 import authRoutes from "./routes/auth.routes";
 import bookingRoutes from "./routes/booking.routes";
 import turfRoutes from "./routes/turf.routes";
@@ -9,11 +12,25 @@ import pricingRoutes from "./routes/pricing.routes";
 import settingRoutes from "./routes/setting.routes";
 import adminRoutes from "./routes/admin.routes";
 import publicRoutes from "./routes/public.routes";
+import analyticsRoutes from "./routes/analytics.routes";
 import uploadRoutes from "./routes/upload.routes";
 import { errorHandler } from "./middleware/error.middleware";
 import "reflect-metadata";
 
 const app = express();
+
+// Security Headers
+app.use(helmet());
+app.disable("x-powered-by");
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+app.use("/api", limiter); // Apply to API routes
 
 const corsOptions = {
   origin: [
@@ -35,9 +52,17 @@ app.options("/api/bookings/update-payment-status", cors({ origin: "*" }));
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-app.use(express.json());
+app.use(express.json({ limit: "10kb" })); // Body limit
 app.use(cookieParser());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+
+
+// Prevent Parameter Pollution
+app.use(hpp());
+
+// ETag Configuration (Weak by default in Express, explicitly setting if needed or leaving default)
+app.set('etag', 'weak'); 
+
 app.use("/api/auth", authRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/turfs", turfRoutes);
@@ -45,6 +70,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/pricing", pricingRoutes);
 app.use("/api/settings", settingRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/analytics", analyticsRoutes);
 app.use("/api", publicRoutes);
 app.use("/api", uploadRoutes);
 
