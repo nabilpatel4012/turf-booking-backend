@@ -22,16 +22,13 @@ export class BookingController {
   }
 
   createBooking = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.id;
-    const role = req.user!.role;
-    const { turfId, date, startTime, endTime } = req.body;
+    const userId = req.user!.id; // Authenticated user
+    const role = req.user!.role; // User role
+    let booking; // Declare booking variable here
 
-    console.log("[BookingController] createBooking request received", { userId, role, body: req.body });
-
-    let booking;
-
+    // Conditional Logic based on Role
     if (role === AuthRole.ADMIN) {
-      console.log("[BookingController] Processing Admin booking");
+      // Admin creating booking (for themselves or guest)
       // If Admin is booking, ensure they have a User account (Shadow User)
       const admin = await this.adminRepository.findOne({ where: { id: userId } });
       if (!admin) {
@@ -55,6 +52,7 @@ export class BookingController {
         await this.userRepository.save(user);
       }
       const bookingUserId = user.id;
+      const { turfId, date, startTime, endTime } = req.body;
 
       booking = await this.bookingService.createBookingForAdmin({
         turfId,
@@ -66,8 +64,9 @@ export class BookingController {
         createdByRole: role,
       });
     } else {
-      console.log("[BookingController] Processing User booking");
+
       // User booking
+      const { turfId, date, startTime, endTime } = req.body;
       booking = await this.bookingService.createBookingForUser({
         turfId,
         userId,

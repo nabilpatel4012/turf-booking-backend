@@ -80,7 +80,6 @@ export class BookingService {
       createdByRole,
     } = data;
 
-    console.log("[BookingService] _createBookingInternal started", { turfId, date, startTime, endTime });
 
     // 1. Acquire Lock on Turf
     const turf = await transactionalEntityManager.findOne(Turf, {
@@ -98,7 +97,6 @@ export class BookingService {
 
     // 2. Check if bookings are disabled (skip for admin)
     const turfSettings = await this.turfSettingService.getTurfSettings(turfId);
-    console.log("[BookingService] got the turf settings in _createBookingInternal", { turfSettings });
     const timezone = turfSettings.timezone || "Asia/Kolkata";
 
     if (createdByRole !== AuthRole.ADMIN) {
@@ -143,10 +141,8 @@ export class BookingService {
       .getCount();
 
     if (overlapCount > 0) {
-      console.log("[BookingService] Overlap found!", overlapCount);
       throw new AppError("Time slot already booked", 409);
     }
-    console.log("[BookingService] Overlap check passed");
 
     // 6. Calculate total amount
     const totalAmount = await this.pricingService.calculatePrice(
@@ -190,7 +186,6 @@ export class BookingService {
   }
 
   async createBookingForUser(data: CreateBookingDto) {
-    console.log("[BookingService] createBookingForUser called", data);
     // 1. Create Booking in Transaction
     const result = await AppDataSource.transaction(async (transactionalEntityManager) => {
       // Create booking with PENDING status
@@ -202,10 +197,6 @@ export class BookingService {
 
       // Check Turf Settings for Payment
       const turfSettings = await this.turfSettingService.getTurfSettings(data.turfId);
-      console.log("[BookingService] Turf Settings:", { 
-          requireAdvance: turfSettings.requireAdvancePayment, 
-          advanceAmount: turfSettings.advancePaymentAmount 
-      });
       let razorpayOrder = undefined;
       let advanceAmount = 0;
 
@@ -217,7 +208,6 @@ export class BookingService {
         const totalPayable = advanceAmount + platformFee;
         
         if (totalPayable > 0) {
-          console.log("[BookingService] Creating Razorpay Order for amount:", totalPayable);
           try {
              // Generate Unique Receipt ID
              const receiptId = `R_${data.turfId.slice(0, 8)}_${Date.now()}`;
@@ -234,7 +224,6 @@ export class BookingService {
                 "App ID": data.turfId
               }
             );
-             console.log("[BookingService] Razorpay Order Created:", razorpayOrder.id);
             booking.orderId = razorpayOrder.id;
             
             // Populate Payment & Metadata Fields
