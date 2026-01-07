@@ -292,7 +292,7 @@ export class StatsService {
 
     const selectCases = ranges.map(
       (range, idx) =>
-        `COALESCE(SUM(CASE WHEN booking.createdAt >= :start${idx} AND booking.createdAt <= :end${idx} THEN booking.price ELSE 0 END), 0) as earnings${idx}`
+        `COALESCE(SUM(CASE WHEN booking.createdAt >= :start${idx} AND booking.createdAt <= :end${idx} THEN booking.totalAmount ELSE 0 END), 0) as earnings${idx}`
     );
 
     query = query.select(selectCases);
@@ -333,7 +333,7 @@ export class StatsService {
         .select("booking.userId", "userId")
         .addSelect("user.email", "email")
         .addSelect("COUNT(*)", "bookingCount")
-        .addSelect("SUM(booking.price)", "totalSpent")
+        .addSelect("SUM(booking.totalAmount)", "totalSpent")
         .andWhere("booking.status != :cancelled", {
           cancelled: BookingStatus.CANCELLED,
         })

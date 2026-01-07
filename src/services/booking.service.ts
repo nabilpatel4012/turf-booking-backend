@@ -905,7 +905,7 @@ export class BookingService {
     // 1. Verify Turf Ownership
     const turf = await this.turfRepository.findOne({
       where: { id: turfId },
-      select: ["ownerId", "name", "openingTime", "closingTime"],
+      select: ["ownerId", "name", "status"],
     });
 
     if (!turf) {
@@ -914,6 +914,9 @@ export class BookingService {
 
     if (turf.ownerId !== adminId) {
       throw new AppError("Unauthorized: You do not own this turf", 403);
+    }
+    if (turf.status !== "active") {
+      throw new AppError("Turf is not active", 403);
     }
 
     // 2. Find Booking
