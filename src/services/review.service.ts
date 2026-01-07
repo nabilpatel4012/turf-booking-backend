@@ -66,6 +66,7 @@ export class ReviewService {
     const review = this.reviewRepository.create({
       userId,
       bookingId,
+      turfId: booking.turfId,
       rating,
       comment: comment || "",
     });
