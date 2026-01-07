@@ -5,6 +5,7 @@ import { Admin } from "../entities/admin.entity";
 import { Turf } from "../entities/turf.entity";
 import { Booking } from "../entities/booking.entity";
 import { Review } from "../entities/review.entity";
+import { ReviewReport } from "../entities/review-report.entity";
 import { Pricing } from "../entities/pricing.entity";
 import { Announcement } from "../entities/announcement.entity";
 import { Setting } from "../entities/setting.entity";
@@ -32,6 +33,7 @@ export const AppDataSource = new DataSource({
     Turf,
     Booking,
     Review,
+    ReviewReport,
     Pricing,
     Announcement,
     Setting,

@@ -1,15 +1,18 @@
 import { Repository } from "typeorm";
 import { Review } from "../entities/review.entity";
+import { ReviewReport } from "../entities/review-report.entity";
 import { Booking, BookingStatus } from "../entities/booking.entity";
 import { AppDataSource } from "../db/data.source";
 
 export class ReviewService {
   private reviewRepository: Repository<Review>;
   private bookingRepository: Repository<Booking>;
+  private reportRepository: Repository<ReviewReport>;
 
   constructor() {
     this.reviewRepository = AppDataSource.getRepository(Review);
     this.bookingRepository = AppDataSource.getRepository(Booking);
+    this.reportRepository = AppDataSource.getRepository(ReviewReport);
   }
 
   async createReview(
@@ -127,5 +130,84 @@ export class ReviewService {
       rating: parseInt(d.rating),
       count: parseInt(d.count),
     }));
+  }
+
+
+  async updateReview(
+    userId: string,
+    reviewId: string,
+    rating: number,
+    comment?: string
+  ) {
+    const review = await this.reviewRepository.findOne({
+      where: { id: reviewId },
+    });
+
+    if (!review) {
+      throw new Error("Review not found");
+    }
+
+    if (review.userId !== userId) {
+      throw new Error("You can only update your own reviews");
+    }
+
+    if (rating < 1 || rating > 5) {
+      throw new Error("Rating must be between 1 and 5");
+    }
+
+    review.rating = rating;
+    review.comment = comment || review.comment;
+
+    return await this.reviewRepository.save(review);
+  }
+
+  async deleteReview(userId: string, reviewId: string, isAdmin: boolean = false) {
+    const review = await this.reviewRepository.findOne({
+      where: { id: reviewId },
+    });
+
+    if (!review) {
+      throw new Error("Review not found");
+    }
+
+    if (!isAdmin && review.userId !== userId) {
+      throw new Error("You can only delete your own reviews");
+    }
+
+    return await this.reviewRepository.remove(review);
+  }
+
+  async reportReview(userId: string, reviewId: string, reason: string) {
+    const review = await this.reviewRepository.findOne({
+      where: { id: reviewId },
+    });
+
+    if (!review) {
+      throw new Error("Review not found");
+    }
+    
+    const existingReport = await this.reportRepository.findOne({
+        where: { userId, reviewId }
+    });
+    
+    if (existingReport) {
+        throw new Error("You have already reported this review");
+    }
+
+    const report = this.reportRepository.create({
+      userId,
+      reviewId,
+      reason,
+      status: "pending",
+    });
+
+    return await this.reportRepository.save(report);
+  }
+
+  async getReviewReports() {
+    return await this.reportRepository.find({
+      relations: ["review", "review.user", "user"],
+      order: { createdAt: "DESC" },
+    });
   }
 }
