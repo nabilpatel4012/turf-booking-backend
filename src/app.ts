@@ -22,6 +22,7 @@ const app = express();
 // Security Headers
 app.use(helmet());
 app.disable("x-powered-by");
+app.set("trust proxy", 1); // Trust first proxy (e.g. Nginx/Cloudflare)
 
 // Rate Limiting
 const limiter = rateLimit({
