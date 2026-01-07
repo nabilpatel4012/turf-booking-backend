@@ -85,7 +85,7 @@ export class AnalyticsService {
           AVG(CASE WHEN b.status = 'completed' THEN b.paid_amount END) as avg_booking_value,
           AVG(CASE WHEN b.status = 'completed' THEN r.rating END) as avg_rating,
           COUNT(DISTINCT r.id) as review_count,
-          COUNT(DISTINCT b.date || EXTRACT(HOUR FROM b.start_time)) as occupied_slots
+          COUNT(DISTINCT b.date::text || EXTRACT(HOUR FROM b.start_time)::text) as occupied_slots
         FROM bookings b
         INNER JOIN turfs t ON b.turf_id = t.id
         LEFT JOIN reviews r ON b.turf_id = r.turf_id
