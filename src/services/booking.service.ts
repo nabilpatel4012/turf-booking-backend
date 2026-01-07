@@ -850,7 +850,7 @@ export class BookingService {
   ): Promise<number> {
     const queryBuilder = this.bookingRepository
       .createQueryBuilder("booking")
-      .select("COALESCE(SUM(booking.price), 0)", "total")
+      .select("COALESCE(SUM(booking.totalAmount), 0)", "total")
       .where("booking.createdAt >= :startDate", { startDate })
       .andWhere("booking.createdAt <= :endDate", { endDate })
       .andWhere("booking.status != :cancelled", {

@@ -11,7 +11,7 @@ import { BookingStatus } from "./booking.entity";
       b.date,
       b.start_time,
       b.end_time,
-      b.price,
+      b.total_amount,
       b.status,
       b.created_by,
       b.cancelled_at,
@@ -54,8 +54,8 @@ export class BookingView {
   @ViewColumn({ name: "end_time" })
   endTime: Date;
 
-  @ViewColumn()
-  price: number;
+  @ViewColumn({ name: "total_amount" })
+  totalAmount: number;
 
   @ViewColumn()
   status: BookingStatus;

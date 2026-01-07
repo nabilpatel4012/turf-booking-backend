@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import app from "./app";
 import { AppDataSource } from "./db/data.source";
+import { initBookingCleanupJob } from "./jobs/booking-cleanup.job";
 
 const PORT = process.env.PORT || 3001;
 
@@ -9,6 +10,9 @@ const startServer = async () => {
     // Initialize database connection
     await AppDataSource.initialize();
     console.log("✓ Database connected successfully");
+
+    // Init Background Jobs
+    initBookingCleanupJob();
 
     // Start server
     app.listen(PORT, () => {
