@@ -42,8 +42,8 @@ export class Booking {
   @Column({ name: "end_time", type: "timestamp" })
   endTime: Date;
 
-  @Column({ type: "decimal", precision: 10, scale: 2 })
-  price: number;
+  @Column({ name: "total_amount", type: "decimal", precision: 10, scale: 2 })
+  totalAmount: number;
 
   @Column({
     type: "enum",

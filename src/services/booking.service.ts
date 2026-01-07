@@ -148,8 +148,8 @@ export class BookingService {
     }
     console.log("[BookingService] Overlap check passed");
 
-    // 6. Calculate price
-    const price = await this.pricingService.calculatePrice(
+    // 6. Calculate total amount
+    const totalAmount = await this.pricingService.calculatePrice(
       turfId,
       startTime,
       endTime,
@@ -180,7 +180,7 @@ export class BookingService {
       date,
       startTime,
       endTime,
-      price,
+      totalAmount,
       status,
       createdBy: creatorName,
     });
@@ -214,16 +214,16 @@ export class BookingService {
         
         // Add 2.5% Platform Fee
         const platformFee = Math.ceil(advanceAmount * 0.025);
-        const totalAmount = advanceAmount + platformFee;
+        const totalPayable = advanceAmount + platformFee;
         
-        if (totalAmount > 0) {
-          console.log("[BookingService] Creating Razorpay Order for amount:", totalAmount);
+        if (totalPayable > 0) {
+          console.log("[BookingService] Creating Razorpay Order for amount:", totalPayable);
           try {
              // Generate Unique Receipt ID
              const receiptId = `R_${data.turfId.slice(0, 8)}_${Date.now()}`;
              
              razorpayOrder = await this.paymentService.createOrder(
-              totalAmount,
+              totalPayable,
               receiptId,
               {
                 turfId: data.turfId,
@@ -243,7 +243,7 @@ export class BookingService {
             booking.appName = "NexSports";
             // We can store the expected paid amount here, or strictly only on success.
             // Let's store what we *expect* to be paid.
-            booking.paidAmount = totalAmount; 
+            booking.paidAmount = totalPayable; 
             
             await transactionalEntityManager.save(Booking, booking);
           } catch (error) {

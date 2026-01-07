@@ -13,8 +13,8 @@ export class AnalyticsService {
           COUNT(*) as total_bookings,
           SUM(CASE WHEN b.status = 'completed' THEN 1 ELSE 0 END) as completed_bookings,
           SUM(CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_bookings,
-          SUM(CASE WHEN b.status = 'completed' THEN b.paid_amount ELSE 0 END) as revenue,
-          AVG(CASE WHEN b.status = 'completed' THEN b.paid_amount ELSE NULL END) as avg_booking_value
+          SUM(CASE WHEN b.status = 'completed' THEN b.total_amount ELSE 0 END) as revenue,
+          AVG(CASE WHEN b.status = 'completed' THEN b.total_amount ELSE NULL END) as avg_booking_value
         FROM bookings b
         INNER JOIN turfs t ON b.turf_id = t.id
         WHERE t.owner_id = $1
@@ -46,7 +46,7 @@ export class AnalyticsService {
         SELECT 
           DATE_TRUNC('month', b.created_at) as month,
           COUNT(*) as bookings,
-          SUM(CASE WHEN b.status = 'completed' THEN b.paid_amount ELSE 0 END) as revenue,
+          SUM(CASE WHEN b.status = 'completed' THEN b.total_amount ELSE 0 END) as revenue,
           COUNT(DISTINCT b.user_id) as unique_customers,
           COUNT(DISTINCT b.turf_id) as unique_turfs
         FROM bookings b
@@ -81,8 +81,8 @@ export class AnalyticsService {
           t.name as turf_name,
           COUNT(*) as total_bookings,
           SUM(CASE WHEN b.status = 'completed' THEN 1 ELSE 0 END) as completed_bookings,
-          SUM(CASE WHEN b.status = 'completed' THEN b.paid_amount ELSE 0 END) as total_revenue,
-          AVG(CASE WHEN b.status = 'completed' THEN b.paid_amount END) as avg_booking_value,
+          SUM(CASE WHEN b.status = 'completed' THEN b.total_amount ELSE 0 END) as total_revenue,
+          AVG(CASE WHEN b.status = 'completed' THEN b.total_amount END) as avg_booking_value,
           AVG(CASE WHEN b.status = 'completed' THEN r.rating END) as avg_rating,
           COUNT(DISTINCT r.id) as review_count,
           COUNT(DISTINCT b.date::text || EXTRACT(HOUR FROM b.start_time)::text) as occupied_slots
@@ -127,8 +127,8 @@ export class AnalyticsService {
           WHEN 6 THEN 'Saturday'
         END as day_name,
         COUNT(*) as booking_count,
-        SUM(CASE WHEN b.status = 'completed' THEN b.paid_amount ELSE 0 END) as revenue,
-        AVG(CASE WHEN b.status = 'completed' THEN b.paid_amount END) as avg_value
+        SUM(CASE WHEN b.status = 'completed' THEN b.total_amount ELSE 0 END) as revenue,
+        AVG(CASE WHEN b.status = 'completed' THEN b.total_amount END) as avg_value
       FROM bookings b
       INNER JOIN turfs t ON b.turf_id = t.id
       WHERE t.owner_id = $1
@@ -147,7 +147,7 @@ export class AnalyticsService {
           b.user_id,
           MAX(b.created_at) as last_booking_date,
           COUNT(*) as total_bookings,
-          SUM(CASE WHEN b.status = 'completed' THEN b.paid_amount ELSE 0 END) as total_spent,
+          SUM(CASE WHEN b.status = 'completed' THEN b.total_amount ELSE 0 END) as total_spent,
           CURRENT_DATE - MAX(DATE(b.created_at)) as days_since_last_booking
         FROM bookings b
         INNER JOIN turfs t ON b.turf_id = t.id
@@ -205,7 +205,7 @@ export class AnalyticsService {
           fb.cohort_month,
           DATE_TRUNC('month', b.created_at) as activity_month,
           COUNT(DISTINCT b.user_id) as active_users,
-          SUM(b.paid_amount) as revenue
+          SUM(b.total_amount) as revenue
         FROM first_booking fb
         JOIN bookings b ON fb.user_id = b.user_id AND b.status = 'completed'
         INNER JOIN turfs t ON b.turf_id = t.id
@@ -336,7 +336,7 @@ export class AnalyticsService {
           DATE_TRUNC('week', b.created_at) as week,
           ROW_NUMBER() OVER (ORDER BY DATE_TRUNC('week', b.created_at)) as week_number,
           COUNT(*) as booking_count,
-          SUM(CASE WHEN b.status = 'completed' THEN b.paid_amount ELSE 0 END) as revenue
+          SUM(CASE WHEN b.status = 'completed' THEN b.total_amount ELSE 0 END) as revenue
         FROM bookings b
         INNER JOIN turfs t ON b.turf_id = t.id
         WHERE t.owner_id = $1
@@ -387,9 +387,9 @@ export class AnalyticsService {
         COUNT(*) FILTER (WHERE b.created_at >= CURRENT_DATE - INTERVAL '60 days' 
           AND b.created_at < CURRENT_DATE - INTERVAL '30 days') as bookings_prev_30d,
         
-        ROUND(SUM(b.paid_amount) FILTER (WHERE b.status = 'completed' 
+        ROUND(SUM(b.total_amount) FILTER (WHERE b.status = 'completed' 
           AND b.created_at >= CURRENT_DATE - INTERVAL '30 days')::numeric, 2) as revenue_l30d,
-        ROUND(SUM(b.paid_amount) FILTER (WHERE b.status = 'completed' 
+        ROUND(SUM(b.total_amount) FILTER (WHERE b.status = 'completed' 
           AND b.created_at >= CURRENT_DATE - INTERVAL '60 days'
           AND b.created_at < CURRENT_DATE - INTERVAL '30 days')::numeric, 2) as revenue_prev_30d,
         
@@ -407,7 +407,7 @@ export class AnalyticsService {
           NULLIF(COUNT(*) FILTER (WHERE b.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) * 100)::numeric, 2) 
           as cancellation_rate_l30d,
         
-        ROUND(AVG(b.paid_amount) FILTER (WHERE b.status = 'completed' 
+        ROUND(AVG(b.total_amount) FILTER (WHERE b.status = 'completed' 
           AND b.created_at >= CURRENT_DATE - INTERVAL '30 days')::numeric, 2) as avg_booking_value_l30d
         
       FROM bookings b
