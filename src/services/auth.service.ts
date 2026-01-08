@@ -6,6 +6,7 @@ import { Admin } from "../entities/admin.entity";
 import { AppDataSource } from "../db/data.source";
 import { SessionService, DeviceInfo } from "./session.service";
 import { Session } from "../entities/session.entity";
+import { OTPService } from "./otp.service";
 
 export enum AuthRole {
   USER = "user",
@@ -50,12 +51,21 @@ export class AuthService {
     name: string,
     deviceInfo: DeviceInfo,
     phone?: string
-  ): Promise<AuthResponse> {
+  ): Promise<{ message: string; email: string }> {
     const existingUser = await this.userRepository.findOne({
       where: { email },
     });
 
     if (existingUser) {
+      // If user exists but not verified, resend OTP
+      if (!existingUser.isVerified) {
+        const otpService = new OTPService();
+        await otpService.sendOTP(email, existingUser.name);
+        return {
+          message: "Verification code sent to your email",
+          email,
+        };
+      }
       throw new Error("User already exists");
     }
 
@@ -66,33 +76,18 @@ export class AuthService {
       password: hashedPassword,
       name,
       phone,
+      isVerified: false,
     });
 
     await this.userRepository.save(user);
 
-    // Create session
-    const session = await this.sessionService.createSession(
-      user.id,
-      null,
-      deviceInfo
-    );
-
-    const accessToken = this.generateAccessToken(
-      user.id,
-      AuthRole.USER,
-      session.id
-    );
+    // Send OTP for verification
+    const otpService = new OTPService();
+    await otpService.sendOTP(email, name);
 
     return {
-      accessToken,
-      refreshToken: session.refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phone: user.phone,
-        role: AuthRole.USER,
-      },
+      message: "Verification code sent to your email",
+      email,
     };
   }
 
@@ -114,6 +109,13 @@ export class AuthService {
 
     if (!user.isActive) {
       throw new Error("Account is deactivated. Please contact support.");
+    }
+
+    if (!user.isVerified) {
+      // Resend OTP if not verified
+      const otpService = new OTPService();
+      await otpService.sendOTP(email, user.name);
+      throw new Error("Email not verified. A new verification code has been sent.");
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);

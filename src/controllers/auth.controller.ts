@@ -39,20 +39,11 @@ export class AuthController {
       phone
     );
 
-    // Set access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, result.accessToken!);
-
-    // Set refresh token as HTTP-only cookie (long-lived)
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
-
+    // Registration now requires OTP verification - return message to user
     res.status(201).json({
-      message: "User registered successfully",
-      user: result.user,
+      message: result.message,
+      email: result.email,
+      requiresVerification: true,
     });
   };
 

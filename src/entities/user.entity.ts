@@ -31,6 +31,9 @@ export class User {
   @Column({ type: "boolean", default: true })
   isActive: boolean;
 
+  @Column({ name: "is_verified", type: "boolean", default: false })
+  isVerified: boolean;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

@@ -14,6 +14,7 @@ import adminRoutes from "./routes/admin.routes";
 import publicRoutes from "./routes/public.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import uploadRoutes from "./routes/upload.routes";
+import webhookRoutes from "./routes/webhook.routes";
 import { errorHandler } from "./middleware/error.middleware";
 import "reflect-metadata";
 
@@ -50,6 +51,10 @@ const corsOptions = {
 app.use("/api/bookings/update-payment-status", cors({ origin: "*" }));
 app.options("/api/bookings/update-payment-status", cors({ origin: "*" }));
 
+// Allow any origin for webhooks (External services)
+app.use("/api/webhooks", cors({ origin: "*" }));
+app.options("/api/webhooks", cors({ origin: "*" }));
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -74,6 +79,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api", publicRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api/webhooks", webhookRoutes);
 
 app.use(errorHandler);
 

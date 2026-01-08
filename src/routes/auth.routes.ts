@@ -12,9 +12,11 @@ import {
   authenticateAdmin,
   authenticate,
 } from "../middleware/auth.middleware";
+import { OTPController } from "../controllers/otp.controller";
 
 const router = Router();
 const authController = new AuthController();
+const otpController = new OTPController();
 const adminIP = process.env.ADMIN_IP || "65.0.11.156";
 
 // User Routes
@@ -89,5 +91,11 @@ router.delete(
   authenticate,
   asyncHandler(authController.revokeAllSessions)
 );
+
+
+
+
+router.post("/user/verify-otp", asyncHandler(otpController.verifyOTP));
+router.post("/user/resend-otp", asyncHandler(otpController.resendOTP));
 
 export default router;

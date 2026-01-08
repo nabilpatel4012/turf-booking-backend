@@ -14,6 +14,7 @@ import * as bcrypt from "bcryptjs";
 import { TurfSettingService } from "./turf-setting.service";
 import { toZonedTime } from "date-fns-tz";
 import { APIFeatures } from "../utils/api.features";
+import { EmailService } from "./email.service";
 
 
 export interface CreateBookingDto {
@@ -61,8 +62,10 @@ export class BookingService {
     this.userRepository = AppDataSource.getRepository(User);
     this.adminRepository = AppDataSource.getRepository(Admin);
     this.paymentService = new PaymentService();
-
+    this.emailService = new EmailService();
   }
+
+  private emailService: EmailService;
 
   // Internal method to handle core booking logic within a transaction
   private async _createBookingInternal(
@@ -400,7 +403,14 @@ export class BookingService {
         verifiedAt: new Date()
       };
       
-      return await this.bookingRepository.save(booking);
+      const savedBooking = await this.bookingRepository.save(booking);
+
+      // Send confirmation email
+      this.sendBookingConfirmationEmail(savedBooking).catch((e: unknown) => 
+        console.error("Failed to send booking confirmation email:", e)
+      );
+
+      return savedBooking;
   }
 
   async updateBookingPaymentStatus(orderId: string, paymentId: string) {
@@ -714,7 +724,16 @@ export class BookingService {
       booking.cancellationReason = cancellationReason;
     }
 
-    return await this.bookingRepository.save(booking);
+    const savedBooking = await this.bookingRepository.save(booking);
+
+    // Send cancellation email
+    this.sendBookingCancellationEmail(
+      savedBooking, 
+      role === AuthRole.ADMIN ? "admin" : "user",
+      cancellationReason
+    ).catch((e: unknown) => console.error("Failed to send booking cancellation email:", e));
+
+    return savedBooking;
   }
 
   async confirmBooking(bookingId: string, adminId: string) {
@@ -1034,6 +1053,89 @@ export class BookingService {
       booking: { ...booking, user: { name: booking.user?.name, phone: booking.user?.phone } },
       paymentStatus
     };
+  }
+
+  /**
+   * Helper to send booking confirmation email
+   */
+  private async sendBookingConfirmationEmail(booking: Booking): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({ where: { id: booking.userId } });
+      const turf = await this.turfRepository.findOne({ where: { id: booking.turfId } });
+
+      if (!user || !turf) {
+        console.warn("Cannot send confirmation email: user or turf not found");
+        return;
+      }
+
+      await this.emailService.sendBookingConfirmation({
+        userName: user.name,
+        userEmail: user.email,
+        turfName: turf.name,
+        turfAddress: `${turf.address}, ${turf.city}`,
+        bookingDate: booking.date,
+        startTime: this.formatTime(booking.startTime),
+        endTime: this.formatTime(booking.endTime),
+        totalAmount: Number(booking.totalAmount),
+        paidAmount: booking.paidAmount ? Number(booking.paidAmount) : undefined,
+        bookingId: booking.id,
+        orderId: booking.orderId || undefined,
+      });
+    } catch (error: unknown) {
+      console.error("Error sending booking confirmation email:", error);
+    }
+  }
+
+  /**
+   * Helper to send booking cancellation email
+   */
+  private async sendBookingCancellationEmail(
+    booking: Booking,
+    cancelledBy: "user" | "admin",
+    cancellationReason?: string
+  ): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({ where: { id: booking.userId } });
+      const turf = await this.turfRepository.findOne({ where: { id: booking.turfId } });
+
+      if (!user || !turf) {
+        console.warn("Cannot send cancellation email: user or turf not found");
+        return;
+      }
+
+      // Calculate refund if applicable
+      let refundAmount: number | undefined;
+      if (booking.paidAmount && Number(booking.paidAmount) > 0) {
+        const turfSettings = await this.turfSettingService.getTurfSettings(booking.turfId);
+        if (turfSettings.refundEnabled) {
+          refundAmount = Math.floor(Number(booking.paidAmount) * (turfSettings.refundPercentage / 100));
+        }
+      }
+
+      await this.emailService.sendBookingCancellation({
+        userName: user.name,
+        userEmail: user.email,
+        turfName: turf.name,
+        turfAddress: `${turf.address}, ${turf.city}`,
+        bookingDate: booking.date,
+        startTime: this.formatTime(booking.startTime),
+        endTime: this.formatTime(booking.endTime),
+        totalAmount: Number(booking.totalAmount),
+        bookingId: booking.id,
+        cancellationReason,
+        cancelledBy,
+        refundAmount,
+      });
+    } catch (error: unknown) {
+      console.error("Error sending booking cancellation email:", error);
+    }
+  }
+
+  /**
+   * Helper to format time for emails
+   */
+  private formatTime(date: Date): string {
+    return formatInTimeZone(date, "Asia/Kolkata", "hh:mm a");
   }
 }
 
