@@ -42,84 +42,119 @@ export const BookingConfirmation = ({
   return (
     <Html>
       <Head />
-      <Preview>Your booking at {turfName} is confirmed! 🎉</Preview>
+      <Preview>Your booking at {turfName} is confirmed</Preview>
       <Body style={main}>
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
+            <Img
+              src="https://app.nexsports.in/android-chrome-192x192.png"
+              width="48"
+              height="48"
+              alt="NexSports"
+              style={logo}
+            />
             <Heading style={logoText}>NexSports</Heading>
           </Section>
 
           {/* Success Banner */}
           <Section style={successBanner}>
-            <Text style={successIcon}>✓</Text>
-            <Heading style={successHeading}>Booking Confirmed!</Heading>
+            <div style={checkmarkCircle}>
+              <Text style={checkmark}>✓</Text>
+            </div>
+            <Heading style={successHeading}>Booking Confirmed</Heading>
+            <Text style={successSubtext}>
+              Your reservation has been successfully processed
+            </Text>
           </Section>
 
           {/* Greeting */}
           <Section style={content}>
-            <Text style={greeting}>Hi {userName},</Text>
+            <Text style={greeting}>Hello {userName},</Text>
             <Text style={message}>
-              Great news! Your booking has been successfully confirmed. Here are
-              your booking details:
+              Your booking has been confirmed. Please find the details below:
             </Text>
           </Section>
 
           {/* Booking Details Card */}
           <Section style={detailsCard}>
-            <Text style={cardTitle}>📍 {turfName}</Text>
-            <Text style={cardAddress}>{turfAddress}</Text>
+            {/* Venue Details */}
+            <Section style={venueSection}>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={mapIcon}
+              >
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              <div style={venueInfo}>
+                <Text style={venueName}>{turfName}</Text>
+                <Text style={venueAddress}>{turfAddress}</Text>
+              </div>
+            </Section>
+
             <Hr style={divider} />
 
-            <Row>
-              <Column>
+            {/* Date and Time */}
+            <Section style={infoGrid}>
+              <div style={infoItem}>
                 <Text style={labelText}>Date</Text>
                 <Text style={valueText}>{bookingDate}</Text>
-              </Column>
-              <Column>
+              </div>
+              <div style={infoItem}>
                 <Text style={labelText}>Time</Text>
                 <Text style={valueText}>
                   {startTime} - {endTime}
                 </Text>
-              </Column>
-            </Row>
+              </div>
+            </Section>
 
             <Hr style={divider} />
 
-            <Row>
-              <Column>
+            {/* Booking and Order IDs */}
+            <Section style={idSection}>
+              <div style={idItem}>
                 <Text style={labelText}>Booking ID</Text>
-                <Text style={valueTextSmall}>{bookingId}</Text>
-              </Column>
+                <Text style={idText}>{bookingId}</Text>
+              </div>
               {orderId && (
-                <Column>
+                <div style={idItem}>
                   <Text style={labelText}>Order ID</Text>
-                  <Text style={valueTextSmall}>{orderId}</Text>
-                </Column>
+                  <Text style={idText}>{orderId}</Text>
+                </div>
               )}
-            </Row>
+            </Section>
 
             <Hr style={divider} />
 
-            <Row>
-              <Column>
+            {/* Payment Details */}
+            <Section style={paymentSection}>
+              <div style={paymentItem}>
                 <Text style={labelText}>Total Amount</Text>
-                <Text style={amountText}>₹{totalAmount}</Text>
-              </Column>
+                <Text style={amountText}>₹{totalAmount.toLocaleString()}</Text>
+              </div>
               {paidAmount !== undefined && (
-                <Column>
-                  <Text style={labelText}>Paid Amount</Text>
-                  <Text style={amountTextGreen}>₹{paidAmount}</Text>
-                </Column>
+                <div style={paymentItem}>
+                  <Text style={labelText}>Amount Paid</Text>
+                  <Text style={paidAmountText}>₹{paidAmount.toLocaleString()}</Text>
+                </div>
               )}
-            </Row>
+            </Section>
           </Section>
 
           {/* Footer */}
           <Section style={footer}>
             <Text style={footerText}>
-              Questions? Reply to this email or contact our support team.
+              For any queries, please contact our support team.
             </Text>
+            <Hr style={footerDivider} />
             <Text style={footerTextSmall}>
               © 2026 NexSports. All rights reserved.
             </Text>
@@ -134,147 +169,249 @@ export default BookingConfirmation;
 
 // Styles
 const main = {
-  backgroundColor: "#f4f4f5",
+  backgroundColor: "#fafafa",
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  padding: "20px 0",
 };
 
 const container = {
   margin: "0 auto",
-  padding: "20px 0",
-  maxWidth: "580px",
+  maxWidth: "600px",
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e5e5",
+  borderRadius: "8px",
+  overflow: "hidden",
 };
 
 const header = {
-  backgroundColor: "#18181b",
-  padding: "20px",
+  backgroundColor: "#000000",
+  padding: "32px 24px",
   textAlign: "center" as const,
-  borderRadius: "12px 12px 0 0",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "12px",
+};
+
+const logo = {
+  display: "inline-block",
+  verticalAlign: "middle",
+  marginRight: "12px",
 };
 
 const logoText = {
-  color: "#22c55e",
-  fontSize: "28px",
-  fontWeight: "bold",
+  color: "#ffffff",
+  fontSize: "24px",
+  fontWeight: "600",
   margin: "0",
+  display: "inline-block",
+  verticalAlign: "middle",
+  letterSpacing: "-0.5px",
 };
 
 const successBanner = {
-  backgroundColor: "#22c55e",
-  padding: "30px 20px",
+  backgroundColor: "#ffffff",
+  padding: "40px 24px",
   textAlign: "center" as const,
+  borderBottom: "1px solid #e5e5e5",
 };
 
-const successIcon = {
-  fontSize: "48px",
+const checkmarkCircle = {
+  width: "64px",
+  height: "64px",
+  borderRadius: "50%",
+  backgroundColor: "#000000",
+  margin: "0 auto 16px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const checkmark = {
+  fontSize: "32px",
   color: "#ffffff",
-  margin: "0 0 10px 0",
+  margin: "0",
+  fontWeight: "bold",
 };
 
 const successHeading = {
-  color: "#ffffff",
-  fontSize: "24px",
-  fontWeight: "bold",
+  color: "#000000",
+  fontSize: "28px",
+  fontWeight: "600",
+  margin: "0 0 8px 0",
+  letterSpacing: "-0.5px",
+};
+
+const successSubtext = {
+  fontSize: "15px",
+  color: "#737373",
   margin: "0",
+  lineHeight: "1.5",
 };
 
 const content = {
-  backgroundColor: "#ffffff",
-  padding: "30px",
+  padding: "32px 24px 24px",
 };
 
 const greeting = {
-  fontSize: "18px",
-  fontWeight: "600",
-  color: "#18181b",
-  margin: "0 0 10px 0",
+  fontSize: "16px",
+  fontWeight: "500",
+  color: "#000000",
+  margin: "0 0 12px 0",
 };
 
 const message = {
   fontSize: "15px",
-  color: "#52525b",
+  color: "#525252",
   lineHeight: "1.6",
   margin: "0",
 };
 
 const detailsCard = {
-  backgroundColor: "#fafafa",
-  border: "1px solid #e4e4e7",
-  borderRadius: "12px",
+  border: "1px solid #e5e5e5",
+  borderRadius: "6px",
+  margin: "0 24px 24px",
   padding: "24px",
-  margin: "0 30px 30px 30px",
+  backgroundColor: "#fafafa",
 };
 
-const cardTitle = {
-  fontSize: "18px",
-  fontWeight: "bold",
-  color: "#18181b",
+const venueSection = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "12px",
+  marginBottom: "4px",
+};
+
+const mapIcon = {
+  color: "#000000",
+  flexShrink: "0",
+  marginTop: "2px",
+};
+
+const venueInfo = {
+  flex: "1",
+};
+
+const venueName = {
+  fontSize: "17px",
+  fontWeight: "600",
+  color: "#000000",
   margin: "0 0 4px 0",
+  lineHeight: "1.4",
 };
 
-const cardAddress = {
+const venueAddress = {
   fontSize: "14px",
-  color: "#71717a",
+  color: "#737373",
   margin: "0",
+  lineHeight: "1.5",
 };
 
 const divider = {
-  borderColor: "#e4e4e7",
-  margin: "16px 0",
+  borderColor: "#e5e5e5",
+  margin: "20px 0",
+};
+
+const infoGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "16px",
+};
+
+const infoItem = {
+  minWidth: "0",
 };
 
 const labelText = {
   fontSize: "12px",
-  color: "#71717a",
+  color: "#737373",
   textTransform: "uppercase" as const,
   letterSpacing: "0.5px",
-  margin: "0 0 4px 0",
+  margin: "0 0 6px 0",
+  fontWeight: "500",
 };
 
 const valueText = {
-  fontSize: "16px",
-  fontWeight: "600",
-  color: "#18181b",
+  fontSize: "15px",
+  fontWeight: "500",
+  color: "#000000",
   margin: "0",
+  lineHeight: "1.4",
 };
 
-const valueTextSmall = {
+const idSection = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "16px",
+};
+
+const idItem = {
+  width: "100%",
+};
+
+const idText = {
   fontSize: "14px",
   fontWeight: "500",
-  color: "#18181b",
+  color: "#000000",
   margin: "0",
-  fontFamily: "monospace",
+  fontFamily: "Menlo, Monaco, Consolas, monospace",
+  backgroundColor: "#ffffff",
+  padding: "8px 12px",
+  borderRadius: "4px",
+  border: "1px solid #e5e5e5",
+  display: "inline-block",
+};
+
+const paymentSection = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "16px",
+};
+
+const paymentItem = {
+  flex: "1",
 };
 
 const amountText = {
   fontSize: "20px",
-  fontWeight: "bold",
-  color: "#18181b",
+  fontWeight: "600",
+  color: "#000000",
   margin: "0",
+  letterSpacing: "-0.5px",
 };
 
-const amountTextGreen = {
+const paidAmountText = {
   fontSize: "20px",
-  fontWeight: "bold",
-  color: "#22c55e",
+  fontWeight: "600",
+  color: "#000000",
   margin: "0",
+  letterSpacing: "-0.5px",
 };
 
 const footer = {
-  backgroundColor: "#f4f4f5",
-  padding: "30px",
+  padding: "32px 24px",
   textAlign: "center" as const,
-  borderRadius: "0 0 12px 12px",
+  backgroundColor: "#fafafa",
+  borderTop: "1px solid #e5e5e5",
 };
 
 const footerText = {
   fontSize: "14px",
-  color: "#71717a",
-  margin: "0 0 10px 0",
+  color: "#737373",
+  margin: "0 0 16px 0",
+  lineHeight: "1.5",
+};
+
+const footerDivider = {
+  borderColor: "#e5e5e5",
+  margin: "16px auto",
+  maxWidth: "200px",
 };
 
 const footerTextSmall = {
-  fontSize: "12px",
-  color: "#a1a1aa",
+  fontSize: "13px",
+  color: "#a3a3a3",
   margin: "0",
 };

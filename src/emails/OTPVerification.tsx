@@ -4,6 +4,7 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Preview,
   Section,
   Text,
@@ -30,40 +31,83 @@ export const OTPVerification = ({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
+            <Img
+              src="https://app.nexsports.in/android-chrome-192x192.png"
+              width="48"
+              height="48"
+              alt="NexSports"
+              style={logo}
+            />
             <Heading style={logoText}>NexSports</Heading>
           </Section>
 
           {/* Content */}
           <Section style={content}>
             <Heading style={heading}>Verify Your Email</Heading>
-            <Text style={greeting}>Hi {userName},</Text>
+            <Text style={greeting}>Hello {userName},</Text>
             <Text style={message}>
-              Thank you for registering with NexSports! Please use the
+              Thank you for registering with NexSports. Please use the
               verification code below to complete your registration:
             </Text>
 
             {/* OTP Box */}
             <Section style={otpContainer}>
+              <Text style={otpLabel}>Verification Code</Text>
               <Text style={otpCode}>{otp}</Text>
             </Section>
 
-            <Text style={expiryText}>
-              ⏱️ This code expires in {expiryMinutes} minutes
-            </Text>
+            {/* Expiry Info */}
+            <Section style={expiryBox}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={clockIcon}
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <Text style={expiryText}>
+                This code expires in {expiryMinutes} minutes
+              </Text>
+            </Section>
 
             <Hr style={divider} />
 
-            <Text style={warningText}>
-              If you didn't request this code, you can safely ignore this email.
-              Someone might have entered your email address by mistake.
-            </Text>
+            {/* Warning Section */}
+            <Section style={warningSection}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={alertIcon}
+              >
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <Text style={warningText}>
+                If you didn't request this code, you can safely ignore this email. Someone might have entered your email address by mistake.
+              </Text>
+            </Section>
           </Section>
 
           {/* Footer */}
           <Section style={footer}>
             <Text style={footerText}>
-              Need help? Reply to this email or contact our support team.
+              For any queries, please contact our support team.
             </Text>
+            <Hr style={footerDivider} />
             <Text style={footerTextSmall}>
               © 2026 NexSports. All rights reserved.
             </Text>
@@ -78,111 +122,174 @@ export default OTPVerification;
 
 // Styles
 const main = {
-  backgroundColor: "#f4f4f5",
+  backgroundColor: "#fafafa",
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  padding: "20px 0",
 };
 
 const container = {
   margin: "0 auto",
-  padding: "20px 0",
-  maxWidth: "580px",
+  maxWidth: "600px",
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e5e5",
+  borderRadius: "8px",
+  overflow: "hidden",
 };
 
 const header = {
-  backgroundColor: "#18181b",
-  padding: "20px",
+  backgroundColor: "#000000",
+  padding: "32px 24px",
   textAlign: "center" as const,
-  borderRadius: "12px 12px 0 0",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "12px",
+};
+
+const logo = {
+  display: "inline-block",
+  verticalAlign: "middle",
+  marginRight: "12px",
 };
 
 const logoText = {
-  color: "#22c55e",
-  fontSize: "28px",
-  fontWeight: "bold",
+  color: "#ffffff",
+  fontSize: "24px",
+  fontWeight: "600",
   margin: "0",
+  display: "inline-block",
+  verticalAlign: "middle",
+  letterSpacing: "-0.5px",
 };
 
 const content = {
-  backgroundColor: "#ffffff",
-  padding: "40px 30px",
+  padding: "40px 24px",
   textAlign: "center" as const,
 };
 
 const heading = {
-  fontSize: "24px",
-  fontWeight: "bold",
-  color: "#18181b",
-  margin: "0 0 20px 0",
+  fontSize: "28px",
+  fontWeight: "600",
+  color: "#000000",
+  margin: "0 0 24px 0",
+  letterSpacing: "-0.5px",
 };
 
 const greeting = {
   fontSize: "16px",
-  fontWeight: "600",
-  color: "#18181b",
-  margin: "0 0 10px 0",
+  fontWeight: "500",
+  color: "#000000",
+  margin: "0 0 12px 0",
   textAlign: "left" as const,
 };
 
 const message = {
   fontSize: "15px",
-  color: "#52525b",
+  color: "#525252",
   lineHeight: "1.6",
-  margin: "0 0 30px 0",
+  margin: "0 0 32px 0",
   textAlign: "left" as const,
 };
 
 const otpContainer = {
-  backgroundColor: "#f4f4f5",
-  border: "2px dashed #22c55e",
-  borderRadius: "12px",
-  padding: "20px",
+  backgroundColor: "#fafafa",
+  border: "2px solid #000000",
+  borderRadius: "8px",
+  padding: "32px 24px",
   margin: "0 0 20px 0",
 };
 
+const otpLabel = {
+  fontSize: "12px",
+  color: "#737373",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.5px",
+  margin: "0 0 12px 0",
+  fontWeight: "500",
+};
+
 const otpCode = {
-  fontSize: "36px",
-  fontWeight: "bold",
-  color: "#18181b",
-  letterSpacing: "8px",
+  fontSize: "40px",
+  fontWeight: "700",
+  color: "#000000",
+  letterSpacing: "12px",
   margin: "0",
-  fontFamily: "monospace",
+  fontFamily: "Menlo, Monaco, Consolas, monospace",
+};
+
+const expiryBox = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  margin: "0 0 24px 0",
+};
+
+const clockIcon = {
+  color: "#525252",
+  flexShrink: "0",
 };
 
 const expiryText = {
   fontSize: "14px",
-  color: "#71717a",
-  margin: "0 0 20px 0",
+  color: "#525252",
+  margin: "0",
+  fontWeight: "500",
 };
 
 const divider = {
-  borderColor: "#e4e4e7",
-  margin: "20px 0",
+  borderColor: "#e5e5e5",
+  margin: "24px 0",
+};
+
+const warningSection = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "12px",
+  backgroundColor: "#fafafa",
+  border: "1px solid #e5e5e5",
+  borderRadius: "6px",
+  padding: "16px",
+  textAlign: "left" as const,
+};
+
+const alertIcon = {
+  color: "#525252",
+  flexShrink: "0",
+  marginTop: "2px",
 };
 
 const warningText = {
   fontSize: "13px",
-  color: "#a1a1aa",
-  lineHeight: "1.5",
+  color: "#525252",
+  lineHeight: "1.6",
   margin: "0",
-  textAlign: "left" as const,
+  flex: "1",
 };
 
 const footer = {
-  backgroundColor: "#f4f4f5",
-  padding: "30px",
+  padding: "32px 24px",
   textAlign: "center" as const,
-  borderRadius: "0 0 12px 12px",
+  backgroundColor: "#fafafa",
+  borderTop: "1px solid #e5e5e5",
 };
 
 const footerText = {
   fontSize: "14px",
-  color: "#71717a",
-  margin: "0 0 10px 0",
+  color: "#737373",
+  margin: "0 0 16px 0",
+  lineHeight: "1.5",
+};
+
+const footerDivider = {
+  borderColor: "#e5e5e5",
+  margin: "16px auto",
+  maxWidth: "200px",
 };
 
 const footerTextSmall = {
-  fontSize: "12px",
-  color: "#a1a1aa",
+  fontSize: "13px",
+  color: "#a3a3a3",
   margin: "0",
 };

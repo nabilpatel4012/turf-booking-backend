@@ -4,12 +4,11 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Preview,
   Section,
   Text,
   Hr,
-  Row,
-  Column,
 } from "@react-email/components";
 import * as React from "react";
 
@@ -45,96 +44,147 @@ export const BookingCancellation = ({
   return (
     <Html>
       <Head />
-      <Preview>
-        Your booking at {turfName} has been cancelled
-      </Preview>
+      <Preview>Your booking at {turfName} has been cancelled</Preview>
       <Body style={main}>
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
+            <Img
+              src="https://app.nexsports.in/android-chrome-192x192.png"
+              width="48"
+              height="48"
+              alt="NexSports"
+              style={logo}
+            />
             <Heading style={logoText}>NexSports</Heading>
           </Section>
 
           {/* Cancellation Banner */}
           <Section style={cancelBanner}>
-            <Text style={cancelIcon}>✕</Text>
+            <div style={cancelCircle}>
+              <Text style={cancelIcon}>✕</Text>
+            </div>
             <Heading style={cancelHeading}>Booking Cancelled</Heading>
+            <Text style={cancelSubtext}>
+              {isCancelledByAdmin
+                ? "This booking has been cancelled by the venue"
+                : "Your cancellation request has been processed"}
+            </Text>
           </Section>
 
           {/* Greeting */}
           <Section style={content}>
-            <Text style={greeting}>Hi {userName},</Text>
+            <Text style={greeting}>Hello {userName},</Text>
             <Text style={message}>
               {isCancelledByAdmin
-                ? "Your booking has been cancelled by the venue administrator."
-                : "Your booking has been successfully cancelled as per your request."}
+                ? "Your booking has been cancelled by the venue administrator. We apologize for any inconvenience."
+                : "Your booking has been successfully cancelled as requested."}
             </Text>
           </Section>
 
           {/* Booking Details Card */}
           <Section style={detailsCard}>
-            <Text style={cardTitle}>📍 {turfName}</Text>
-            <Text style={cardAddress}>{turfAddress}</Text>
+            {/* Venue Details */}
+            <Section style={venueSection}>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={mapIcon}
+              >
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              <div style={venueInfo}>
+                <Text style={venueName}>{turfName}</Text>
+                <Text style={venueAddress}>{turfAddress}</Text>
+              </div>
+            </Section>
+
             <Hr style={divider} />
 
-            <Row>
-              <Column>
+            {/* Date and Time */}
+            <Section style={infoGrid}>
+              <div style={infoItem}>
                 <Text style={labelText}>Date</Text>
                 <Text style={valueText}>{bookingDate}</Text>
-              </Column>
-              <Column>
+              </div>
+              <div style={infoItem}>
                 <Text style={labelText}>Time</Text>
                 <Text style={valueText}>
                   {startTime} - {endTime}
                 </Text>
-              </Column>
-            </Row>
+              </div>
+            </Section>
 
             <Hr style={divider} />
 
-            <Row>
-              <Column>
+            {/* Booking ID and Cancelled By */}
+            <Section style={idSection}>
+              <div style={idItem}>
                 <Text style={labelText}>Booking ID</Text>
-                <Text style={valueTextSmall}>{bookingId}</Text>
-              </Column>
-              <Column>
+                <Text style={idText}>{bookingId}</Text>
+              </div>
+              <div style={idItem}>
                 <Text style={labelText}>Cancelled By</Text>
-                <Text style={valueText}>
-                  {isCancelledByAdmin ? "Venue Admin" : "You"}
+                <Text style={cancelledByText}>
+                  {isCancelledByAdmin ? "Venue Administrator" : "You"}
                 </Text>
-              </Column>
-            </Row>
+              </div>
+            </Section>
 
             {cancellationReason && (
               <>
                 <Hr style={divider} />
-                <Text style={labelText}>Cancellation Reason</Text>
-                <Text style={reasonText}>{cancellationReason}</Text>
+                <Section style={reasonSection}>
+                  <Text style={labelText}>Cancellation Reason</Text>
+                  <Text style={reasonText}>{cancellationReason}</Text>
+                </Section>
               </>
             )}
 
             <Hr style={divider} />
 
-            <Row>
-              <Column>
+            {/* Payment Details */}
+            <Section style={paymentSection}>
+              <div style={paymentItem}>
                 <Text style={labelText}>Original Amount</Text>
-                <Text style={amountTextStrike}>₹{totalAmount}</Text>
-              </Column>
+                <Text style={amountTextStrike}>₹{totalAmount.toLocaleString()}</Text>
+              </div>
               {refundAmount !== undefined && (
-                <Column>
+                <div style={paymentItem}>
                   <Text style={labelText}>Refund Amount</Text>
-                  <Text style={amountTextGreen}>₹{refundAmount}</Text>
-                </Column>
+                  <Text style={refundAmountText}>₹{refundAmount.toLocaleString()}</Text>
+                </div>
               )}
-            </Row>
+            </Section>
           </Section>
 
-          {/* Info Box */}
+          {/* Refund Info Box */}
           {refundAmount !== undefined && (
             <Section style={infoBox}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={infoIcon}
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
               <Text style={infoText}>
-                💰 Your refund of ₹{refundAmount} will be processed within 5-7
-                business days to your original payment method.
+                Your refund of ₹{refundAmount.toLocaleString()} will be processed within 5-7 business days to your original payment method.
               </Text>
             </Section>
           )}
@@ -142,8 +192,9 @@ export const BookingCancellation = ({
           {/* Footer */}
           <Section style={footer}>
             <Text style={footerText}>
-              Need help? Reply to this email or contact our support team.
+              For any queries, please contact our support team.
             </Text>
+            <Hr style={footerDivider} />
             <Text style={footerTextSmall}>
               © 2026 NexSports. All rights reserved.
             </Text>
@@ -158,170 +209,299 @@ export default BookingCancellation;
 
 // Styles
 const main = {
-  backgroundColor: "#f4f4f5",
+  backgroundColor: "#fafafa",
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  padding: "20px 0",
 };
 
 const container = {
   margin: "0 auto",
-  padding: "20px 0",
-  maxWidth: "580px",
+  maxWidth: "600px",
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e5e5",
+  borderRadius: "8px",
+  overflow: "hidden",
 };
 
 const header = {
-  backgroundColor: "#18181b",
-  padding: "20px",
+  backgroundColor: "#000000",
+  padding: "32px 24px",
   textAlign: "center" as const,
-  borderRadius: "12px 12px 0 0",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "12px",
+};
+
+const logo = {
+  display: "inline-block",
+  verticalAlign: "middle",
+  marginRight: "12px",
 };
 
 const logoText = {
-  color: "#22c55e",
-  fontSize: "28px",
-  fontWeight: "bold",
+  color: "#ffffff",
+  fontSize: "24px",
+  fontWeight: "600",
   margin: "0",
+  display: "inline-block",
+  verticalAlign: "middle",
+  letterSpacing: "-0.5px",
 };
 
 const cancelBanner = {
-  backgroundColor: "#ef4444",
-  padding: "30px 20px",
+  backgroundColor: "#ffffff",
+  padding: "40px 24px",
   textAlign: "center" as const,
+  borderBottom: "1px solid #e5e5e5",
+};
+
+const cancelCircle = {
+  width: "64px",
+  height: "64px",
+  borderRadius: "50%",
+  backgroundColor: "#000000",
+  margin: "0 auto 16px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 
 const cancelIcon = {
-  fontSize: "48px",
+  fontSize: "32px",
   color: "#ffffff",
-  margin: "0 0 10px 0",
+  margin: "0",
+  fontWeight: "bold",
 };
 
 const cancelHeading = {
-  color: "#ffffff",
-  fontSize: "24px",
-  fontWeight: "bold",
+  color: "#000000",
+  fontSize: "28px",
+  fontWeight: "600",
+  margin: "0 0 8px 0",
+  letterSpacing: "-0.5px",
+};
+
+const cancelSubtext = {
+  fontSize: "15px",
+  color: "#737373",
   margin: "0",
+  lineHeight: "1.5",
 };
 
 const content = {
-  backgroundColor: "#ffffff",
-  padding: "30px",
+  padding: "32px 24px 24px",
 };
 
 const greeting = {
-  fontSize: "18px",
-  fontWeight: "600",
-  color: "#18181b",
-  margin: "0 0 10px 0",
+  fontSize: "16px",
+  fontWeight: "500",
+  color: "#000000",
+  margin: "0 0 12px 0",
 };
 
 const message = {
   fontSize: "15px",
-  color: "#52525b",
+  color: "#525252",
   lineHeight: "1.6",
   margin: "0",
 };
 
 const detailsCard = {
-  backgroundColor: "#fafafa",
-  border: "1px solid #e4e4e7",
-  borderRadius: "12px",
+  border: "1px solid #e5e5e5",
+  borderRadius: "6px",
+  margin: "0 24px 24px",
   padding: "24px",
-  margin: "0 30px 20px 30px",
+  backgroundColor: "#fafafa",
 };
 
-const cardTitle = {
-  fontSize: "18px",
-  fontWeight: "bold",
-  color: "#18181b",
-  margin: "0 0 4px 0",
+const venueSection = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "12px",
+  marginBottom: "4px",
 };
 
-const cardAddress = {
-  fontSize: "14px",
-  color: "#71717a",
-  margin: "0",
+const mapIcon = {
+  color: "#000000",
+  flexShrink: "0",
+  marginTop: "2px",
 };
 
-const divider = {
-  borderColor: "#e4e4e7",
-  margin: "16px 0",
+const venueInfo = {
+  flex: "1",
 };
 
-const labelText = {
-  fontSize: "12px",
-  color: "#71717a",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.5px",
-  margin: "0 0 4px 0",
-};
-
-const valueText = {
-  fontSize: "16px",
+const venueName = {
+  fontSize: "17px",
   fontWeight: "600",
-  color: "#18181b",
-  margin: "0",
+  color: "#000000",
+  margin: "0 0 4px 0",
+  lineHeight: "1.4",
 };
 
-const valueTextSmall = {
+const venueAddress = {
   fontSize: "14px",
-  fontWeight: "500",
-  color: "#18181b",
-  margin: "0",
-  fontFamily: "monospace",
-};
-
-const reasonText = {
-  fontSize: "14px",
-  color: "#52525b",
-  fontStyle: "italic",
-  margin: "0",
-};
-
-const amountTextStrike = {
-  fontSize: "18px",
-  fontWeight: "600",
-  color: "#a1a1aa",
-  textDecoration: "line-through",
-  margin: "0",
-};
-
-const amountTextGreen = {
-  fontSize: "20px",
-  fontWeight: "bold",
-  color: "#22c55e",
-  margin: "0",
-};
-
-const infoBox = {
-  backgroundColor: "#fef3c7",
-  border: "1px solid #fbbf24",
-  borderRadius: "8px",
-  padding: "16px",
-  margin: "0 30px 20px 30px",
-};
-
-const infoText = {
-  fontSize: "14px",
-  color: "#92400e",
+  color: "#737373",
   margin: "0",
   lineHeight: "1.5",
 };
 
+const divider = {
+  borderColor: "#e5e5e5",
+  margin: "20px 0",
+};
+
+const infoGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "16px",
+};
+
+const infoItem = {
+  minWidth: "0",
+};
+
+const labelText = {
+  fontSize: "12px",
+  color: "#737373",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.5px",
+  margin: "0 0 6px 0",
+  fontWeight: "500",
+};
+
+const valueText = {
+  fontSize: "15px",
+  fontWeight: "500",
+  color: "#000000",
+  margin: "0",
+  lineHeight: "1.4",
+};
+
+const idSection = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "16px",
+};
+
+const idItem = {
+  width: "100%",
+};
+
+const idText = {
+  fontSize: "14px",
+  fontWeight: "500",
+  color: "#000000",
+  margin: "0",
+  fontFamily: "Menlo, Monaco, Consolas, monospace",
+  backgroundColor: "#ffffff",
+  padding: "8px 12px",
+  borderRadius: "4px",
+  border: "1px solid #e5e5e5",
+  display: "inline-block",
+};
+
+const cancelledByText = {
+  fontSize: "15px",
+  fontWeight: "500",
+  color: "#000000",
+  margin: "0",
+  lineHeight: "1.4",
+};
+
+const reasonSection = {
+  width: "100%",
+};
+
+const reasonText = {
+  fontSize: "14px",
+  color: "#525252",
+  fontStyle: "italic",
+  margin: "0",
+  lineHeight: "1.6",
+  backgroundColor: "#ffffff",
+  padding: "12px",
+  borderRadius: "4px",
+  border: "1px solid #e5e5e5",
+};
+
+const paymentSection = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "16px",
+};
+
+const paymentItem = {
+  flex: "1",
+};
+
+const amountTextStrike = {
+  fontSize: "18px",
+  fontWeight: "500",
+  color: "#a3a3a3",
+  textDecoration: "line-through",
+  margin: "0",
+  letterSpacing: "-0.5px",
+};
+
+const refundAmountText = {
+  fontSize: "20px",
+  fontWeight: "600",
+  color: "#000000",
+  margin: "0",
+  letterSpacing: "-0.5px",
+};
+
+const infoBox = {
+  backgroundColor: "#fafafa",
+  border: "1px solid #e5e5e5",
+  borderRadius: "6px",
+  padding: "16px",
+  margin: "0 24px 24px",
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "12px",
+};
+
+const infoIcon = {
+  color: "#000000",
+  flexShrink: "0",
+  marginTop: "2px",
+};
+
+const infoText = {
+  fontSize: "14px",
+  color: "#525252",
+  margin: "0",
+  lineHeight: "1.6",
+  flex: "1",
+};
+
 const footer = {
-  backgroundColor: "#f4f4f5",
-  padding: "30px",
+  padding: "32px 24px",
   textAlign: "center" as const,
-  borderRadius: "0 0 12px 12px",
+  backgroundColor: "#fafafa",
+  borderTop: "1px solid #e5e5e5",
 };
 
 const footerText = {
   fontSize: "14px",
-  color: "#71717a",
-  margin: "0 0 10px 0",
+  color: "#737373",
+  margin: "0 0 16px 0",
+  lineHeight: "1.5",
+};
+
+const footerDivider = {
+  borderColor: "#e5e5e5",
+  margin: "16px auto",
+  maxWidth: "200px",
 };
 
 const footerTextSmall = {
-  fontSize: "12px",
-  color: "#a1a1aa",
+  fontSize: "13px",
+  color: "#a3a3a3",
   margin: "0",
 };
