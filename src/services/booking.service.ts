@@ -15,6 +15,9 @@ import { TurfSettingService } from "./turf-setting.service";
 import { toZonedTime } from "date-fns-tz";
 import { APIFeatures } from "../utils/api.features";
 import { EmailService } from "./email.service";
+// Helper for date formatting
+import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 
 export interface CreateBookingDto {
@@ -1133,11 +1136,11 @@ export class BookingService {
 
   /**
    * Helper to format time for emails
+   * Note: The DB stores times in IST already, so we just format without timezone conversion
    */
   private formatTime(date: Date): string {
-    return formatInTimeZone(date, "Asia/Kolkata", "hh:mm a");
+    return format(date, "hh:mm a");
   }
 }
 
-// Helper for date formatting if needed, or import from date-fns-tz
-import { formatInTimeZone } from "date-fns-tz";
+
