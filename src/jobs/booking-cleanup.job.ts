@@ -1,24 +1,22 @@
 import cron from "node-cron";
 import { AppDataSource } from "../db/data.source";
 import { Booking, BookingStatus } from "../entities/booking.entity";
-import { LessThanOrEqual, In } from "typeorm";
+import { LessThanOrEqual, IsNull, Not } from "typeorm";
 import { toZonedTime } from "date-fns-tz";
 
 export const initBookingCleanupJob = () => {
-    // Run every 15 minutes
-    cron.schedule("*/15 * * * *", async () => {
+    // Run every 5 minutes
+    cron.schedule("*/5 * * * *", async () => {
         console.log("[BookingCleanupJob] Running...");
         try {
             const bookingRepo = AppDataSource.getRepository(Booking);
             
             // Get current time in IST (Asia/Kolkata)
-            // This ensures we compare against the correct wall-clock time in India
             const now = new Date();
             const istTime = toZonedTime(now, "Asia/Kolkata");
 
-            // Find bookings that are CONFIRMED and end time is in the past (using IST reference)
-            // Also include 'ACTIVE' if you use that status for ongoing
-            const result = await bookingRepo.update(
+            // 1. Mark CONFIRMED bookings as COMPLETED if end time is in the past
+            const completedResult = await bookingRepo.update(
                 {
                     status: BookingStatus.CONFIRMED,
                     endTime: LessThanOrEqual(istTime),
@@ -28,13 +26,35 @@ export const initBookingCleanupJob = () => {
                 }
             );
 
-            if (result.affected && result.affected > 0) {
-                console.log(`[BookingCleanupJob] Marked ${result.affected} bookings as COMPLETED.`);
+            if (completedResult.affected && completedResult.affected > 0) {
+                console.log(`[BookingCleanupJob] Marked ${completedResult.affected} bookings as COMPLETED.`);
             }
+
+            // 2. Cancel expired PENDING bookings (slot lock expired)
+            const expiredPendingResult = await bookingRepo
+                .createQueryBuilder()
+                .update(Booking)
+                .set({
+                    status: BookingStatus.CANCELLED,
+                    cancellationReason: "Payment timeout - slot lock expired",
+                    cancelledAt: now,
+                    paidAmount: () => "NULL",
+                    orderId: () => "NULL",
+                    lockedUntil: () => "NULL",
+                })
+                .where("status = :status", { status: BookingStatus.PENDING })
+                .andWhere("locked_until IS NOT NULL")
+                .andWhere("locked_until <= :now", { now })
+                .execute();
+
+            if (expiredPendingResult.affected && expiredPendingResult.affected > 0) {
+                console.log(`[BookingCleanupJob] Cancelled ${expiredPendingResult.affected} expired pending bookings.`);
+            }
+
         } catch (error) {
             console.error("[BookingCleanupJob] Error:", error);
         }
     });
 
-    console.log("[BookingCleanupJob] Initialized");
+    console.log("[BookingCleanupJob] Initialized - runs every 5 minutes");
 };

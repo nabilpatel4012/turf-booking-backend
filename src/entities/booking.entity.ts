@@ -88,6 +88,9 @@ export class Booking {
   @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
 
+  @Column({ name: "locked_until", type: "timestamp", nullable: true })
+  lockedUntil: Date;
+
   @ManyToOne(() => User, (user) => user.bookings, { eager: false })
   @JoinColumn({ name: "user_id" })
   user: User;

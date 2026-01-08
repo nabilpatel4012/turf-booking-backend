@@ -128,11 +128,11 @@ export class BookingService {
       .createQueryBuilder(Booking, "booking")
       .where("booking.turfId = :turfId", { turfId })
       .andWhere(
-        "(booking.status IN (:...activeStatuses) OR (booking.status = :pendingStatus AND booking.createdAt > :expirationTime))",
+        "(booking.status IN (:...activeStatuses) OR (booking.status = :pendingStatus AND booking.lockedUntil > :now))",
         {
           activeStatuses: [BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
           pendingStatus: BookingStatus.PENDING,
-          expirationTime: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes expiration
+          now: new Date(),
         }
       )
       .andWhere("booking.date = :date", { date })
@@ -179,6 +179,10 @@ export class BookingService {
       totalAmount,
       status,
       createdBy: creatorName,
+      // Set lock expiration for pending bookings (10 minutes)
+      lockedUntil: status === BookingStatus.PENDING 
+        ? new Date(Date.now() + 10 * 60 * 1000) 
+        : undefined,
     });
 
     // 9. Save Booking
@@ -230,9 +234,7 @@ export class BookingService {
             booking.invoiceId = receiptId; // Use the generated receipt ID as invoice ID
             booking.appId = data.turfId;   // Turf ID as App ID
             booking.appName = "NexSports";
-            // We can store the expected paid amount here, or strictly only on success.
-            // Let's store what we *expect* to be paid.
-            booking.paidAmount = totalPayable; 
+            // Do NOT set paidAmount here - only set after payment verification
             
             await transactionalEntityManager.save(Booking, booking);
           } catch (error) {
@@ -368,19 +370,28 @@ export class BookingService {
           throw new AppError("No payment order associated with this booking", 400);
       }
 
+      // Check if booking lock has expired
+      if (booking.lockedUntil && booking.lockedUntil < new Date()) {
+          throw new AppError("Booking slot lock has expired. Please create a new booking.", 400);
+      }
+
       const isValid = this.paymentService.verifyPayment(booking.orderId, paymentId, signature);
       if (!isValid) {
           throw new AppError("Invalid payment signature", 400);
       }
 
+      // Get turf settings to calculate paid amount
+      const turfSettings = await this.turfSettingService.getTurfSettings(booking.turfId);
+      
+      if (turfSettings.requireAdvancePayment) {
+        const advanceAmount = turfSettings.advancePaymentAmount;
+        const platformFee = Math.ceil(advanceAmount * 0.025);
+        booking.paidAmount = advanceAmount + platformFee;
+      }
+
       booking.status = BookingStatus.CONFIRMED;
       booking.paymentId = paymentId;
-      
-      // We can infer the paid amount from the order if we had it, but for now we can rely on what we expected
-      // better yet, we can fetch the order details if we want to be 100% sure, but that requires an extra API call.
-      // For now, let's assume the payment was for the full required advance amount which we likely calculated before.
-      // However, we didn't store the *expected* advance amount on the booking entity itself, only calculated it dynamically.
-      // Let's at least store the paymentId and perhaps the raw signature as info.
+      booking.lockedUntil = null as any; // Clear lock since booking is confirmed
       
       booking.paymentInfo = {
         paymentId,
@@ -388,12 +399,6 @@ export class BookingService {
         signature,
         verifiedAt: new Date()
       };
-      
-      // If we want paidAmount, we might need to store `advanceAmount` on the booking during creation or fetch it.
-      // Since we don't have it on the entity, we might skip `paidAmount` update here OR fetch turf settings again?
-      // Actually, let's leave paidAmount null if we aren't sure, or better:
-      // The user wants `paidAmount`. We can populate it if we add `advanceAmount` to the booking entity or recalculate.
-      // Let's store the `paymentId` as key.
       
       return await this.bookingRepository.save(booking);
   }
@@ -406,8 +411,23 @@ export class BookingService {
     }
 
     if (booking.status === BookingStatus.PENDING) {
+      // Check if lock has expired
+      if (booking.lockedUntil && booking.lockedUntil < new Date()) {
+        throw new AppError("Booking slot lock has expired", 400);
+      }
+
+      // Get turf settings to calculate paid amount
+      const turfSettings = await this.turfSettingService.getTurfSettings(booking.turfId);
+      
+      if (turfSettings.requireAdvancePayment) {
+        const advanceAmount = turfSettings.advancePaymentAmount;
+        const platformFee = Math.ceil(advanceAmount * 0.025);
+        booking.paidAmount = advanceAmount + platformFee;
+      }
+
       booking.status = BookingStatus.CONFIRMED;
       booking.paymentId = paymentId;
+      booking.lockedUntil = null as any; // Clear lock
       return await this.bookingRepository.save(booking);
     }
 
@@ -777,11 +797,11 @@ export class BookingService {
       .createQueryBuilder("booking")
       .where("booking.turfId = :turfId", { turfId })
       .andWhere(
-        "(booking.status IN (:...activeStatuses) OR (booking.status = :pendingStatus AND booking.createdAt > :expirationTime))",
+        "(booking.status IN (:...activeStatuses) OR (booking.status = :pendingStatus AND booking.lockedUntil > :now))",
         {
           activeStatuses: [BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
           pendingStatus: BookingStatus.PENDING,
-          expirationTime: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes expiration
+          now: new Date(),
         }
       )
       .andWhere("booking.date = :date", { date })
