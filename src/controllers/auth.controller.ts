@@ -9,20 +9,56 @@ export class AuthController {
     this.authService = new AuthService();
   }
 
-  // Helper to set HTTP-only cookie
-  private setAccessTokenCookie(res: Response, accessToken: string) {
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
-    });
+  /**
+   * Get cookie domain based on request origin.
+   * This ensures cookies are scoped to specific subdomains:
+   * - app.nexsports.in (user app)
+   * - admin.nexsports.in (admin app)
+   * Prevents cookie collision when same user has both accounts.
+   */
+  private getCookieDomain(req: AuthRequest): string | undefined {
+    const origin = req.get('Origin') || req.get('Referer') || '';
+    
+    if (origin.includes('app.nexsports.in')) {
+      return 'app.nexsports.in';
+    }
+    if (origin.includes('admin.nexsports.in')) {
+      return 'admin.nexsports.in';
+    }
+    // Local development or other origins - no domain restriction
+    return undefined;
   }
 
-  // Helper to clear cookies
-  private clearAuthCookies(res: Response) {
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+  /**
+   * Get cookie options with proper domain scoping
+   */
+  private getCookieOptions(req: AuthRequest, maxAge: number) {
+    const domain = this.getCookieDomain(req);
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      maxAge,
+      ...(domain && { domain }),
+    };
+  }
+
+  // Helper to set HTTP-only cookie (with domain scoping)
+  private setAccessTokenCookie(res: Response, req: AuthRequest, accessToken: string) {
+    res.cookie("accessToken", accessToken, this.getCookieOptions(req, 15 * 60 * 1000));
+  }
+
+  // Helper to set refresh token cookie (with domain scoping)
+  private setRefreshTokenCookie(res: Response, req: AuthRequest, refreshToken: string) {
+    res.cookie("refreshToken", refreshToken, this.getCookieOptions(req, 30 * 24 * 60 * 60 * 1000));
+  }
+
+  // Helper to clear cookies (with domain scoping)
+  private clearAuthCookies(res: Response, req: AuthRequest) {
+    const domain = this.getCookieDomain(req);
+    const clearOptions = domain ? { domain } : {};
+    res.clearCookie("accessToken", clearOptions);
+    res.clearCookie("refreshToken", clearOptions);
   }
 
   // User Registration
@@ -60,20 +96,10 @@ export class AuthController {
     );
 
     // Set access token as HTTP-only cookie
-    res.cookie("accessToken", result.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
-    });
+    this.setAccessTokenCookie(res, req, result.accessToken!);
 
     // Set refresh token as HTTP-only cookie
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    this.setRefreshTokenCookie(res, req, result.refreshToken);
 
     res.json({
       message: "Login successful",
@@ -96,20 +122,10 @@ export class AuthController {
     );
 
     // Set access token as HTTP-only cookie
-    res.cookie("accessToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
-    });
+    this.setAccessTokenCookie(res, req, result.accessToken!);
 
     // Set refresh token as HTTP-only cookie
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    this.setRefreshTokenCookie(res, req, result.refreshToken);
 
     res.status(201).json({
       message: "Admin created successfully",
@@ -130,15 +146,10 @@ export class AuthController {
     );
 
     // Set access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, result.accessToken!);
+    this.setAccessTokenCookie(res, req, result.accessToken!);
 
     // Set refresh token as HTTP-only cookie
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict", //TODO: Make it strict later
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    this.setRefreshTokenCookie(res, req, result.refreshToken);
 
     res.json({
       message: "Login successful",
@@ -157,7 +168,7 @@ export class AuthController {
     const result = await this.authService.refreshAccessToken(refreshToken);
 
     // Set new access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, result.accessToken);
+    this.setAccessTokenCookie(res, req, result.accessToken);
 
     res.json({
       message: "Token refreshed successfully",
@@ -176,7 +187,7 @@ export class AuthController {
     await this.authService.logout(sessionId);
 
     // Clear cookies
-    this.clearAuthCookies(res);
+    this.clearAuthCookies(res, req);
 
     res.json({ message: "Logged out successfully" });
   };
@@ -235,7 +246,7 @@ export class AuthController {
 
     // If revoking current session, clear cookies
     if (sessionId === req.user?.sessionId) {
-      this.clearAuthCookies(res);
+      this.clearAuthCookies(res, req);
     }
 
     res.json({ message: "Session revoked successfully" });
@@ -291,7 +302,7 @@ export class AuthController {
     }
 
     // Clear cookies
-    this.clearAuthCookies(res);
+    this.clearAuthCookies(res, req);
 
     res.json({
       message:

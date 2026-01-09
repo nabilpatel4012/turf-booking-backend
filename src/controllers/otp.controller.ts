@@ -52,12 +52,28 @@ export class OTPController {
         session.id
       );
 
-      // Set access token in cookie
-      res.cookie("access_token", accessToken, {
+      // Set access token in cookie (with origin-aware domain)
+      const origin = req.get('Origin') || req.get('Referer') || '';
+      let cookieDomain: string | undefined;
+      if (origin.includes('app.nexsports.in')) {
+        cookieDomain = 'app.nexsports.in';
+      }
+      
+      res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
         maxAge: 15 * 60 * 1000, // 15 minutes
+        ...(cookieDomain && { domain: cookieDomain }),
+      });
+
+      // Also set refresh token cookie
+      res.cookie("refreshToken", session.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       res.json({
