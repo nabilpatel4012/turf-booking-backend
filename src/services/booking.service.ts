@@ -15,6 +15,7 @@ import { TurfSettingService } from "./turf-setting.service";
 import { toZonedTime } from "date-fns-tz";
 import { APIFeatures } from "../utils/api.features";
 import { EmailService } from "./email.service";
+import { getWhatsAppService, WhatsAppService } from "./whatsapp.service";
 // Helper for date formatting
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
@@ -66,9 +67,11 @@ export class BookingService {
     this.adminRepository = AppDataSource.getRepository(Admin);
     this.paymentService = new PaymentService();
     this.emailService = new EmailService();
+    this.whatsAppService = getWhatsAppService();
   }
 
   private emailService: EmailService;
+  private whatsAppService: WhatsAppService;
 
   // Internal method to handle core booking logic within a transaction
   private async _createBookingInternal(
@@ -408,9 +411,12 @@ export class BookingService {
       
       const savedBooking = await this.bookingRepository.save(booking);
 
-      // Send confirmation email
+      // Send confirmation email and WhatsApp (fire-and-forget)
       this.sendBookingConfirmationEmail(savedBooking).catch((e: unknown) => 
         console.error("Failed to send booking confirmation email:", e)
+      );
+      this.sendBookingConfirmationWhatsApp(savedBooking).catch((e: unknown) => 
+        console.error("Failed to send booking confirmation WhatsApp:", e)
       );
 
       return savedBooking;
@@ -729,12 +735,17 @@ export class BookingService {
 
     const savedBooking = await this.bookingRepository.save(booking);
 
-    // Send cancellation email
+    // Send cancellation email and WhatsApp (fire-and-forget)
     this.sendBookingCancellationEmail(
       savedBooking, 
       role === AuthRole.ADMIN ? "admin" : "user",
       cancellationReason
     ).catch((e: unknown) => console.error("Failed to send booking cancellation email:", e));
+    this.sendBookingCancellationWhatsApp(
+      savedBooking,
+      role === AuthRole.ADMIN ? "admin" : "user",
+      cancellationReason
+    ).catch((e: unknown) => console.error("Failed to send booking cancellation WhatsApp:", e));
 
     return savedBooking;
   }
@@ -1131,6 +1142,92 @@ export class BookingService {
       });
     } catch (error: unknown) {
       console.error("Error sending booking cancellation email:", error);
+    }
+  }
+
+  /**
+   * Helper to send booking confirmation WhatsApp
+   */
+  private async sendBookingConfirmationWhatsApp(booking: Booking): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({ where: { id: booking.userId } });
+      const turf = await this.turfRepository.findOne({ where: { id: booking.turfId } });
+
+      if (!user || !turf) {
+        console.warn("Cannot send confirmation WhatsApp: user or turf not found");
+        return;
+      }
+
+      if (!user.phone) {
+        console.warn("Cannot send confirmation WhatsApp: user phone not available");
+        return;
+      }
+
+      await this.whatsAppService.sendBookingConfirmation({
+        phone: user.phone,
+        userName: user.name,
+        turfName: turf.name,
+        turfAddress: `${turf.address}, ${turf.city}`,
+        bookingDate: booking.date,
+        startTime: this.formatTime(booking.startTime),
+        endTime: this.formatTime(booking.endTime),
+        totalAmount: Number(booking.totalAmount),
+        paidAmount: booking.paidAmount ? Number(booking.paidAmount) : undefined,
+        bookingId: booking.id,
+        orderId: booking.orderId || undefined,
+      });
+    } catch (error: unknown) {
+      console.error("Error sending booking confirmation WhatsApp:", error);
+    }
+  }
+
+  /**
+   * Helper to send booking cancellation WhatsApp
+   */
+  private async sendBookingCancellationWhatsApp(
+    booking: Booking,
+    cancelledBy: "user" | "admin",
+    cancellationReason?: string
+  ): Promise<void> {
+    try {
+      const user = await this.userRepository.findOne({ where: { id: booking.userId } });
+      const turf = await this.turfRepository.findOne({ where: { id: booking.turfId } });
+
+      if (!user || !turf) {
+        console.warn("Cannot send cancellation WhatsApp: user or turf not found");
+        return;
+      }
+
+      if (!user.phone) {
+        console.warn("Cannot send cancellation WhatsApp: user phone not available");
+        return;
+      }
+
+      // Calculate refund if applicable
+      let refundAmount: number | undefined;
+      if (booking.paidAmount && Number(booking.paidAmount) > 0) {
+        const turfSettings = await this.turfSettingService.getTurfSettings(booking.turfId);
+        if (turfSettings.refundEnabled) {
+          refundAmount = Math.floor(Number(booking.paidAmount) * (turfSettings.refundPercentage / 100));
+        }
+      }
+
+      await this.whatsAppService.sendBookingCancellation({
+        phone: user.phone,
+        userName: user.name,
+        turfName: turf.name,
+        turfAddress: `${turf.address}, ${turf.city}`,
+        bookingDate: booking.date,
+        startTime: this.formatTime(booking.startTime),
+        endTime: this.formatTime(booking.endTime),
+        totalAmount: Number(booking.totalAmount),
+        bookingId: booking.id,
+        cancellationReason,
+        cancelledBy,
+        refundAmount,
+      });
+    } catch (error: unknown) {
+      console.error("Error sending booking cancellation WhatsApp:", error);
     }
   }
 

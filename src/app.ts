@@ -15,6 +15,7 @@ import publicRoutes from "./routes/public.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import uploadRoutes from "./routes/upload.routes";
 import webhookRoutes from "./routes/webhook.routes";
+import whatsappRoutes from "./routes/whatsapp.routes";
 import { errorHandler } from "./middleware/error.middleware";
 import "reflect-metadata";
 
@@ -80,6 +81,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api", publicRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api/webhooks", webhookRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
 
 app.use(errorHandler);
 
