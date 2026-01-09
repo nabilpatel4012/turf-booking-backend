@@ -95,7 +95,7 @@ export class EmailService {
         html,
       });
 
-      console.log(`Booking confirmation email sent to ${data.userEmail}:`, result);
+      console.log(`Booking confirmation email sent to ${data.userEmail}:`);
       return true;
     } catch (error) {
       console.error("Failed to send booking confirmation email:", error);
