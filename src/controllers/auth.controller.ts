@@ -10,55 +10,54 @@ export class AuthController {
   }
 
   /**
-   * Get cookie domain based on request origin.
-   * This ensures cookies are scoped to specific subdomains:
-   * - app.nexsports.in (user app)
-   * - admin.nexsports.in (admin app)
-   * Prevents cookie collision when same user has both accounts.
+   * Base cookie options without domain restriction.
+   * Using different cookie names for user vs admin prevents collisions.
    */
-  private getCookieDomain(req: AuthRequest): string | undefined {
-    const origin = req.get('Origin') || req.get('Referer') || '';
-    
-    if (origin.includes('app.nexsports.in')) {
-      return 'app.nexsports.in';
-    }
-    if (origin.includes('admin.nexsports.in')) {
-      return 'admin.nexsports.in';
-    }
-    // Local development or other origins - no domain restriction
-    return undefined;
-  }
-
-  /**
-   * Get cookie options with proper domain scoping
-   */
-  private getCookieOptions(req: AuthRequest, maxAge: number) {
-    const domain = this.getCookieDomain(req);
+  private getCookieOptions(maxAge: number) {
     return {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict' as const,
       maxAge,
-      ...(domain && { domain }),
+      path: '/',
     };
   }
 
-  // Helper to set HTTP-only cookie (with domain scoping)
-  private setAccessTokenCookie(res: Response, req: AuthRequest, accessToken: string) {
-    res.cookie("accessToken", accessToken, this.getCookieOptions(req, 15 * 60 * 1000));
+  // --- USER COOKIE HELPERS ---
+  private setUserAccessTokenCookie(res: Response, accessToken: string) {
+    res.cookie("uAccessToken", accessToken, this.getCookieOptions(15 * 60 * 1000));
   }
 
-  // Helper to set refresh token cookie (with domain scoping)
-  private setRefreshTokenCookie(res: Response, req: AuthRequest, refreshToken: string) {
-    res.cookie("refreshToken", refreshToken, this.getCookieOptions(req, 30 * 24 * 60 * 60 * 1000));
+  private setUserRefreshTokenCookie(res: Response, refreshToken: string) {
+    res.cookie("uRefreshToken", refreshToken, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
   }
 
-  // Helper to clear cookies (with domain scoping)
-  private clearAuthCookies(res: Response, req: AuthRequest) {
-    const domain = this.getCookieDomain(req);
-    const clearOptions = domain ? { domain } : {};
-    res.clearCookie("accessToken", clearOptions);
-    res.clearCookie("refreshToken", clearOptions);
+  private clearUserCookies(res: Response) {
+    res.clearCookie("uAccessToken", { path: '/' });
+    res.clearCookie("uRefreshToken", { path: '/' });
+  }
+
+  // --- ADMIN COOKIE HELPERS ---
+  private setAdminAccessTokenCookie(res: Response, accessToken: string) {
+    res.cookie("aAccessToken", accessToken, this.getCookieOptions(15 * 60 * 1000));
+  }
+
+  private setAdminRefreshTokenCookie(res: Response, refreshToken: string) {
+    res.cookie("aRefreshToken", refreshToken, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+  }
+
+  private clearAdminCookies(res: Response) {
+    res.clearCookie("aAccessToken", { path: '/' });
+    res.clearCookie("aRefreshToken", { path: '/' });
+  }
+
+  // Legacy helper for backward compatibility - clears based on role
+  private clearAuthCookies(res: Response, role?: string) {
+    if (role === 'admin') {
+      this.clearAdminCookies(res);
+    } else {
+      this.clearUserCookies(res);
+    }
   }
 
   // User Registration
@@ -95,11 +94,11 @@ export class AuthController {
       deviceInfo
     );
 
-    // Set access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, req, result.accessToken!);
+    // Set user access token as HTTP-only cookie
+    this.setUserAccessTokenCookie(res, result.accessToken!);
 
-    // Set refresh token as HTTP-only cookie
-    this.setRefreshTokenCookie(res, req, result.refreshToken);
+    // Set user refresh token as HTTP-only cookie
+    this.setUserRefreshTokenCookie(res, result.refreshToken);
 
     res.json({
       message: "Login successful",
@@ -121,11 +120,11 @@ export class AuthController {
       phone
     );
 
-    // Set access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, req, result.accessToken!);
+    // Set admin access token as HTTP-only cookie
+    this.setAdminAccessTokenCookie(res, result.accessToken!);
 
-    // Set refresh token as HTTP-only cookie
-    this.setRefreshTokenCookie(res, req, result.refreshToken);
+    // Set admin refresh token as HTTP-only cookie
+    this.setAdminRefreshTokenCookie(res, result.refreshToken);
 
     res.status(201).json({
       message: "Admin created successfully",
@@ -145,11 +144,11 @@ export class AuthController {
       deviceInfo
     );
 
-    // Set access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, req, result.accessToken!);
+    // Set admin access token as HTTP-only cookie
+    this.setAdminAccessTokenCookie(res, result.accessToken!);
 
-    // Set refresh token as HTTP-only cookie
-    this.setRefreshTokenCookie(res, req, result.refreshToken);
+    // Set admin refresh token as HTTP-only cookie
+    this.setAdminRefreshTokenCookie(res, result.refreshToken);
 
     res.json({
       message: "Login successful",
@@ -157,9 +156,9 @@ export class AuthController {
     });
   };
 
-  // Refresh Access Token
-  refreshToken = async (req: AuthRequest, res: Response) => {
-    const refreshToken = req.cookies.refreshToken;
+  // Refresh User Access Token
+  refreshUserToken = async (req: AuthRequest, res: Response) => {
+    const refreshToken = req.cookies.uRefreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({ error: "Refresh token not provided" });
@@ -167,18 +166,38 @@ export class AuthController {
 
     const result = await this.authService.refreshAccessToken(refreshToken);
 
-    // Set new access token as HTTP-only cookie
-    this.setAccessTokenCookie(res, req, result.accessToken);
+    // Set new user access token as HTTP-only cookie
+    this.setUserAccessTokenCookie(res, result.accessToken);
 
     res.json({
       message: "Token refreshed successfully",
-      ...(result.user ? { user: result.user } : { admin: result.admin }),
+      user: result.user,
+    });
+  };
+
+  // Refresh Admin Access Token
+  refreshAdminToken = async (req: AuthRequest, res: Response) => {
+    const refreshToken = req.cookies.aRefreshToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({ error: "Refresh token not provided" });
+    }
+
+    const result = await this.authService.refreshAccessToken(refreshToken);
+
+    // Set new admin access token as HTTP-only cookie
+    this.setAdminAccessTokenCookie(res, result.accessToken);
+
+    res.json({
+      message: "Token refreshed successfully",
+      admin: result.admin,
     });
   };
 
   // Logout (revoke current session)
   logout = async (req: AuthRequest, res: Response) => {
     const sessionId = req.user?.sessionId;
+    const role = req.user?.role;
 
     if (!sessionId) {
       return res.status(400).json({ error: "No active session" });
@@ -186,8 +205,8 @@ export class AuthController {
 
     await this.authService.logout(sessionId);
 
-    // Clear cookies
-    this.clearAuthCookies(res, req);
+    // Clear cookies based on role
+    this.clearAuthCookies(res, role);
 
     res.json({ message: "Logged out successfully" });
   };
@@ -244,9 +263,9 @@ export class AuthController {
       await sessionService.revokeSession(sessionId, undefined, userId);
     }
 
-    // If revoking current session, clear cookies
+    // If revoking current session, clear cookies based on role
     if (sessionId === req.user?.sessionId) {
-      this.clearAuthCookies(res, req);
+      this.clearAuthCookies(res, role);
     }
 
     res.json({ message: "Session revoked successfully" });
@@ -301,8 +320,8 @@ export class AuthController {
       revokedCount = await sessionService.revokeAllAdminSessions(userId);
     }
 
-    // Clear cookies
-    this.clearAuthCookies(res, req);
+    // Clear cookies based on role
+    this.clearAuthCookies(res, role);
 
     res.json({
       message:

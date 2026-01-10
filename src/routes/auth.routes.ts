@@ -68,8 +68,12 @@ router.post(
   asyncHandler(authController.logout)
 );
 
-// Token Refresh Route (for both users and admins)
-router.post("/refresh-token", asyncHandler(authController.refreshToken));
+// Token Refresh Routes - separate for users and admins
+router.post("/user/refresh-token", asyncHandler(authController.refreshUserToken));
+router.post("/admin/refresh-token", asyncHandler(authController.refreshAdminToken));
+
+// Backward compatible route (uses user refresh token)
+router.post("/refresh-token", asyncHandler(authController.refreshUserToken));
 
 // Session Management Routes (for both users and admins)
 router.get("/sessions", authenticate, asyncHandler(authController.getSessions));

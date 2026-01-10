@@ -11,15 +11,15 @@ export interface AuthRequest extends Request {
 
 const authService = new AuthService();
 
-// Base authentication - extracts and verifies token from cookie
+// Base authentication - extracts and verifies token from either user or admin cookie
 export const authenticate = (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // Try to get token from cookie first, then fall back to Authorization header
-    let token = req.cookies?.accessToken;
+    // Try user token first, then admin token, then Authorization header
+    let token = req.cookies?.uAccessToken || req.cookies?.aAccessToken;
 
     if (!token) {
       const authHeader = req.headers.authorization;
@@ -39,15 +39,15 @@ export const authenticate = (
   }
 };
 
-// Authenticate User only
+// Authenticate User only - only checks uAccessToken
 export const authenticateUser = (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // Try to get token from cookie first, then fall back to Authorization header
-    let token = req.cookies?.accessToken;
+    // Only look for user token (uAccessToken)
+    let token = req.cookies?.uAccessToken;
 
     if (!token) {
       const authHeader = req.headers.authorization;
@@ -73,15 +73,15 @@ export const authenticateUser = (
   }
 };
 
-// Authenticate Admin only
+// Authenticate Admin only - only checks aAccessToken
 export const authenticateAdmin = (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // Try to get token from cookie first, then fall back to Authorization header
-    let token = req.cookies?.accessToken;
+    // Only look for admin token (aAccessToken)
+    let token = req.cookies?.aAccessToken;
 
     if (!token) {
       const authHeader = req.headers.authorization;
