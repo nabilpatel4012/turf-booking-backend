@@ -53,6 +53,10 @@ export class UpdateAnnouncementDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  turfId?: string;
 }
 
 export class GetAnnouncementsQueryDto {

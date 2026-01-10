@@ -6,6 +6,7 @@ import {
   GetAnnouncementsQueryDto,
   UpdateAnnouncementDto,
 } from "../dtos/announcement.dto";
+import { AppError } from "../middleware/error.middleware";
 
 export class AnnouncementController {
   private announcementService: AnnouncementService;
@@ -14,93 +15,91 @@ export class AnnouncementController {
     this.announcementService = new AnnouncementService();
   }
 
-  // IMPROVED: Handles query parameters for filtering
+  // Get announcements - filters by admin's turfs when authenticated admin
   getAnnouncements = async (req: AuthRequest, res: Response) => {
-    try {
-      // Assuming query parameters are parsed into a DTO
-      const query: GetAnnouncementsQueryDto = req.query;
-      const announcements = await this.announcementService.getAllAnnouncements(
-        query
-      );
-      res.status(200).json(announcements);
-    } catch (error: any) {
-      res.status(500).json({
-        message: "Failed to retrieve announcements",
-        error: error.message,
-      });
-    }
+    const adminId = req.user?.id; // Will be available if authenticated admin
+    const query: GetAnnouncementsQueryDto = req.query;
+    
+    const announcements = await this.announcementService.getAllAnnouncements(
+      query,
+      adminId // Pass adminId for ownership filtering
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: announcements,
+    });
   };
 
-  // NEW: Handles getting a single announcement
+  // Get single announcement
   getOneAnnouncement = async (req: AuthRequest, res: Response) => {
-    try {
-      const { id } = req.params;
-      const announcement = await this.announcementService.getAnnouncementById(
-        id
-      );
-      res.status(200).json(announcement);
-    } catch (error: any) {
-      // Check for specific error message to return 404
-      if (error.message === "Announcement not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Failed to retrieve announcement",
-        error: error.message,
-      });
-    }
+    const { id } = req.params;
+    const adminId = req.user?.id;
+    
+    const announcement = await this.announcementService.getAnnouncementById(
+      id,
+      adminId
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: announcement,
+    });
   };
 
-  // IMPROVED: Uses the full DTO from the request body
+  // Create announcement - requires admin authentication
   createAnnouncement = async (req: AuthRequest, res: Response) => {
-    try {
-      // Validate req.body with a library like class-validator before this step
-      const createDto: CreateAnnouncementDto = req.body;
-      const announcement = await this.announcementService.createAnnouncement(
-        createDto
-      );
-      res.status(201).json(announcement);
-    } catch (error: any) {
-      res.status(500).json({
-        message: "Failed to create announcement",
-        error: error.message,
-      });
+    const adminId = req.user?.id;
+    
+    if (!adminId) {
+      throw new AppError("Unauthorized", 401);
     }
+
+    const createDto: CreateAnnouncementDto = req.body;
+    const announcement = await this.announcementService.createAnnouncement(
+      createDto,
+      adminId
+    );
+    
+    res.status(201).json({
+      success: true,
+      data: announcement,
+    });
   };
 
-  // NEW: Handles updating an announcement
+  // Update announcement - requires ownership verification
   updateAnnouncement = async (req: AuthRequest, res: Response) => {
-    try {
-      const { id } = req.params;
-      const updateDto: UpdateAnnouncementDto = req.body;
-      const updatedAnnouncement =
-        await this.announcementService.updateAnnouncement(id, updateDto);
-      res.status(200).json(updatedAnnouncement);
-    } catch (error: any) {
-      if (error.message === "Announcement not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Failed to update announcement",
-        error: error.message,
-      });
+    const { id } = req.params;
+    const adminId = req.user?.id;
+    
+    if (!adminId) {
+      throw new AppError("Unauthorized", 401);
     }
+
+    const updateDto: UpdateAnnouncementDto = req.body;
+    const updatedAnnouncement = await this.announcementService.updateAnnouncement(
+      id,
+      updateDto,
+      adminId
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: updatedAnnouncement,
+    });
   };
 
-  // IMPROVED: Better error handling and status code
+  // Delete announcement - requires ownership verification
   deleteAnnouncement = async (req: AuthRequest, res: Response) => {
-    try {
-      const { id } = req.params;
-      await this.announcementService.deleteAnnouncement(id);
-      res.status(204).send(); // 204 No Content is standard for successful deletion
-    } catch (error: any) {
-      if (error.message === "Announcement not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Failed to delete announcement",
-        error: error.message,
-      });
+    const { id } = req.params;
+    const adminId = req.user?.id;
+    
+    if (!adminId) {
+      throw new AppError("Unauthorized", 401);
     }
+
+    await this.announcementService.deleteAnnouncement(id, adminId);
+    
+    res.status(204).send();
   };
 }

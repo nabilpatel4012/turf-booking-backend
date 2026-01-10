@@ -87,10 +87,11 @@ export class BookingController {
 
   // Get bookings (User: their own, Admin: all for their turfs)
   // Get bookings (User: their own, Admin: all for their turfs)
+  // Get bookings (User: their own, Admin: all for their turfs)
   getBookings = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.id;
     const role = req.user!.role;
-    const { status, turfId, date, ownerId, turfName, page, limit } = req.query;
+    const { status, turfId, date, turfName, page, limit } = req.query;
 
     let result;
 
@@ -105,12 +106,12 @@ export class BookingController {
         limit: limit ? parseInt(limit as string) : 10,
       });
     } else {
-      // Admins see bookings for their turfs
+      // Admins see bookings ONLY for turnfs they own
       result = await this.bookingService.getAllBookings({
         status: status as BookingStatus,
         turfId: turfId as string,
         date: date as string,
-        ownerId: ownerId as string,
+        ownerId: userId, // FORCE ownerId to be the logged-in admin's ID
         turfName: turfName as string,
         page: page ? parseInt(page as string) : 1,
         limit: limit ? parseInt(limit as string) : 10,
@@ -131,18 +132,6 @@ export class BookingController {
     let result;
 
     if (role === AuthRole.USER) {
-      // For user, currently reusing getUserBookings (V1 behavior) or should we allow V2 for them too?
-      // Assuming V2 allows advanced filtering for users too if they use this endpoint.
-      // But service.getUserBookings uses queryBuilder manually.
-      // Let's keep V2 restricted to admins or just mirror V1 for users for now to be safe, 
-      // OR implement getUserBookingsV2 if needed. 
-      // The user request was "apply ... to some user faced and some admin faced".
-      // Let's implement getAllBookingsV2 logic but constrained by user ID if it's a user.
-      // But BookingService doesn't have getUserBookingsV2. 
-      // Let's fallback to V1 for User in V2 endpoint for now, or throw "Not Implemented for User" if not requested.
-      // However, the request implies availability.
-      // Simplest: V2 endpoint calls V1 logic for users, and V2 logic for admins (since we refactored Admin side primarily).
-      
       const { status, turfId, date, turfName, page, limit } = req.query;
       result = await this.bookingService.getUserBookings(userId, {
         status: status as BookingStatus,
@@ -154,23 +143,8 @@ export class BookingController {
       });
 
     } else {
-      // Admin V2
-      const { ownerId } = req.query; // Explicitly extract if passed, though usually implied.
-      // Wait, passing req.query to service which parses it. 
-      // But we need to enforce owner filter if it's an admin viewing "all bookings".
-      // Actually, for admin: `getAllBookingsV2(queryString, ownerId)`.
-      // We should pass `ownerId` from query if they want to filter specific owner? 
-      // No, `ownerId` usually means "bookings for turfs owned by X".
-      // If `req.query` contains `ownerId`, `getAllBookingsV2` will use it if we pass `undefined` as second arg?
-      // No, look at service: `if (ownerId)` block is independent of `queryString`.
-      // So passed arg `ownerId` is the constraint. `queryString` is the filter.
-      // If we want to allow admin to filter by ownerId via query string, we should let `APIFeatures` handle `ownerId` if it's in query?
-      // But `getAllBookingsV2` uses `ownerId` arg to enforce join.
-      // Let's stick to: we pass `req.query.ownerId` as 2nd arg? 
-      // In V1 controller: `ownerId: ownerId as string`.
-      
-      const ownerIdParam = req.query.ownerId as string;
-      result = await this.bookingService.getAllBookingsV2(req.query, ownerIdParam);
+      // Admin V2 - Enforce ownerId
+      result = await this.bookingService.getAllBookingsV2(req.query, userId);
     }
 
     res.status(200).json({
@@ -180,7 +154,8 @@ export class BookingController {
     });
   };
 
-  // Get bookings by Turf ID (Public/Protected based on requirement, assuming protected for now)
+  // Get bookings by Turf ID (Public/Protected based on requirement)
+  // Modified to return sanitized data for privacy
   getBookingsByTurfId = async (req: AuthRequest, res: Response) => {
     const { turfId } = req.params;
     const { status, date, page, limit } = req.query;
@@ -192,9 +167,21 @@ export class BookingController {
       limit: limit ? parseInt(limit as string) : 10,
     });
 
+    // SANITIZE: Only return essential slot info to protect privacy
+    // If we wanted to allow admins to see full info here, we'd check req.user and ownership,
+    // but typically admins use the dashboard API (getBookings). This endpoint is likely for the slot picker.
+    const sanitizedData = result.data.map(b => ({
+      id: b.id,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      date: b.date,
+      status: b.status,
+      // Exclude: userId, userName, userPhone, totalAmount, payment info etc.
+    }));
+
     res.status(200).json({
       success: true,
-      data: result.data,
+      data: sanitizedData,
       meta: result.meta,
     });
   };

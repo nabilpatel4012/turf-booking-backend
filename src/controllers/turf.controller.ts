@@ -68,6 +68,29 @@ export class TurfController {
     });
   };
 
+  // Get single turf for admin (Verifies ownership)
+  getTurfByIdForAdmin = async (req: AuthRequest, res: Response) => {
+    const adminId = req.user?.id;
+    const { id } = req.params;
+
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Reuse getTurfById but verified ownership
+    // Ideally service should have getTurfByIdForOwner, but we can fetch and check
+    const turf = await this.turfService.getTurfById(id, true); // true = include inactive
+
+    if (turf.ownerId !== adminId) {
+       return res.status(403).json({ error: "You don't have permission to view this turf" });
+    }
+
+    res.json({
+      success: true,
+      data: turf,
+    });
+  };
+
   // Create new turf (admin only)
   createTurf = async (req: AuthRequest, res: Response) => {
     const adminId = req.user?.id;

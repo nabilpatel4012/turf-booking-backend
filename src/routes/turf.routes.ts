@@ -23,6 +23,12 @@ router.get(
   asyncHandler(turfController.getMyTurfs)
 );
 
+router.get(
+  "/admin/:id",
+  authenticateAdmin,
+  asyncHandler(turfController.getTurfByIdForAdmin)
+);
+
 router.post(
   "/admin/create",
   authenticateAdmin,
