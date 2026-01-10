@@ -18,8 +18,19 @@ export const authenticate = (
   next: NextFunction
 ) => {
   try {
-    // Try user token first, then admin token, then Authorization header
-    let token = req.cookies?.uAccessToken || req.cookies?.aAccessToken;
+    let token;
+
+    // INTELLIGENT TOKEN RESOLUTION:
+    // If route contains "/admin", prioritize Admin Token.
+    // Otherwise, prioritize User Token.
+    // This fixes the conflict if both tokens exist in cookie (Multi-App Login).
+    const isAdminRoute = req.originalUrl.includes("/admin");
+
+    if (isAdminRoute) {
+       token = req.cookies?.aAccessToken || req.cookies?.uAccessToken;
+    } else {
+       token = req.cookies?.uAccessToken || req.cookies?.aAccessToken;
+    }
 
     if (!token) {
       const authHeader = req.headers.authorization;
@@ -103,6 +114,36 @@ export const authenticateAdmin = (
     req.user = decoded;
     next();
   } catch (error) {
+    res.status(401).json({ error: "Invalid or expired token" });
+  }
+};
+
+// Optional authentication - populates req.user if token present, otherwise valid guest
+export const authenticateOptional = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    let token = req.cookies?.uAccessToken || req.cookies?.aAccessToken;
+
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+      }
+    }
+
+    if (token) {
+      req.user = authService.verifyToken(token);
+    }
+    
+    // If no token, or token verification failed (caught below), we just proceed as guest (user undefined)
+    next();
+  } catch (error) {
+    // If token is invalid, allow proceeding as guest (ignore bad token) for optional routes
+    // OR enforce 401 if a token was attempted but failed. 
+    // Generally "Optional" means "If you have a badge, show it. If it's fake, we kick you out."
     res.status(401).json({ error: "Invalid or expired token" });
   }
 };

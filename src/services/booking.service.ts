@@ -606,6 +606,64 @@ export class BookingService {
     };
   }
 
+  // DEDICATED Service Method for Admin Bookings (Strict Isolation)
+  async getAdminBookings(
+    adminId: string,
+    filters?: {
+      status?: BookingStatus;
+      turfId?: string;
+      date?: string;
+      turfName?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    // Start Query Builder
+    const queryBuilder = this.bookingViewRepository.createQueryBuilder("booking");
+
+    // STRICT JOIN: Only include bookings for turfs owned by this admin
+    queryBuilder
+      .innerJoin(Turf, "turf", "booking.turfId = turf.id AND turf.ownerId = :adminId", { adminId })
+      // Use Inner Join + AND condition to enforce strictness at DB level
+    
+    // Apply filters
+    if (filters?.status) {
+      queryBuilder.andWhere("booking.status = :status", { status: filters.status });
+    }
+
+    if (filters?.turfId) {
+      queryBuilder.andWhere("booking.turfId = :turfId", { turfId: filters.turfId });
+    }
+
+    if (filters?.date) {
+      queryBuilder.andWhere("booking.date = :date", { date: filters.date });
+    }
+
+    if (filters?.turfName) {
+      queryBuilder.andWhere("booking.turfName ILIKE :turfName", { turfName: `%${filters.turfName}%` });
+    }
+
+    const [data, total] = await queryBuilder
+      .orderBy("booking.createdAt", "DESC")
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   async getBookingsByTurfId(
     turfId: string,
     filters?: {

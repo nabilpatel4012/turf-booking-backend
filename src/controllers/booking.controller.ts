@@ -85,43 +85,67 @@ export class BookingController {
     });
   };
 
-  // Get bookings (User: their own, Admin: all for their turfs)
-  // Get bookings (User: their own, Admin: all for their turfs)
-  // Get bookings (User: their own, Admin: all for their turfs)
+  // Get bookings (Strictly for USERS now)
   getBookings = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.id;
     const role = req.user!.role;
+
+    // Safety check: ensure only users access this or redirected correctly
+    if (role !== AuthRole.USER) {
+       // Typically admins shouldn't use this route anymore, but if they do, 
+       // we could either throw 403 or redirect logic. 
+       // User requested separate routes. 
+       // Let's enforce USERS only here to avoid ambiguity.
+       // However, if we want to be nice, we could tell them to use the admin route.
+       // But for strictness:
+       // throw new AppError("Admins should use /bookings/admin/my-bookings", 400);
+       // Or just default to empty if not user?
+       // Let's implement User Logic only.
+    }
+
     const { status, turfId, date, turfName, page, limit } = req.query;
 
-    let result;
-
-    if (role === AuthRole.USER) {
-      // Users see only their bookings
-      result = await this.bookingService.getUserBookings(userId, {
-        status: status as BookingStatus,
-        turfId: turfId as string,
-        turfName: turfName as string,
-        date: date as string,
-        page: page ? parseInt(page as string) : 1,
-        limit: limit ? parseInt(limit as string) : 10,
-      });
-    } else {
-      // Admins see bookings ONLY for turnfs they own
-      result = await this.bookingService.getAllBookings({
-        status: status as BookingStatus,
-        turfId: turfId as string,
-        date: date as string,
-        ownerId: userId, // FORCE ownerId to be the logged-in admin's ID
-        turfName: turfName as string,
-        page: page ? parseInt(page as string) : 1,
-        limit: limit ? parseInt(limit as string) : 10,
-      });
-    }
+    const result = await this.bookingService.getUserBookings(userId, {
+      status: status as BookingStatus,
+      turfId: turfId as string,
+      turfName: turfName as string,
+      date: date as string,
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 10,
+    });
 
     res.status(200).json({
       success: true,
       data: result.data,
       meta: result.meta,
+    });
+  };
+
+  // Dedicated Admin Route for fetching bookings (Uses Service Level Query)
+  getAdminBookings = async (req: AuthRequest, res: Response) => {
+    const adminId = req.user!.id;
+    
+    // Strict Role Check
+    if (req.user?.role !== AuthRole.ADMIN) {
+        throw new AppError("Access denied. Admins only.", 403);
+    }
+
+    const { status, turfId, date, turfName, page, limit } = req.query;
+
+    // Use the NEW dedicated service method
+    const result = await this.bookingService.getAdminBookings(adminId, {
+        status: status as BookingStatus,
+        turfId: turfId as string,
+        date: date as string,
+        turfName: turfName as string,
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 10,
+    });
+
+    res.status(200).json({
+        success: true,
+        data: result.data,
+        meta: result.meta,
     });
   };
 

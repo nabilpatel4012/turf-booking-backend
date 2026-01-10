@@ -6,14 +6,15 @@ import {
   authenticate,
   authenticateUser,
   authenticateAdmin,
+  authenticateOptional,
 } from "../middleware/auth.middleware";
 
 const router = Router();
 const turfController = new TurfController();
 
-// Public routes (accessible by both users and guests)
-router.get("/", asyncHandler(turfController.getAllTurfs));
-router.get("/v2", asyncHandler(turfController.getAllTurfsV2));
+// Public routes (accessible by both users and guests) - Optional Auth allows filtering for Admins
+router.get("/", authenticateOptional, asyncHandler(turfController.getAllTurfs));
+router.get("/v2", authenticateOptional, asyncHandler(turfController.getAllTurfsV2));
 router.get("/:id", asyncHandler(turfController.getTurfById));
 
 // Admin routes - Turf management

@@ -34,7 +34,7 @@ router.post(
 
 router.get("/verify-qr", authenticate, bookingController.verifyQR);
 router.get("/turf/:turfId", bookingController.getBookingsByTurfId);
-router.get("/", authenticate, asyncHandler(bookingController.getBookings));
+router.get("/", authenticateUser, asyncHandler(bookingController.getBookings)); // Strictly User
 router.get("/v2", authenticate, asyncHandler(bookingController.getBookingsV2));
 
 router.get(
@@ -52,6 +52,12 @@ router.delete(
 );
 
 // Admin-only routes
+router.get(
+  "/admin/my-bookings",
+  authenticateAdmin,
+  asyncHandler(bookingController.getAdminBookings)
+);
+
 router.post(
   "/admin/create-for-user",
   authenticateAdmin,

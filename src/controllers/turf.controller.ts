@@ -2,6 +2,7 @@ import { Response } from "express";
 import { TurfService } from "../services/turf.service";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { TurfStatus } from "../entities/turf.entity";
+import { AuthRole } from "../services/auth.service"; // Import AuthRole
 
 export class TurfController {
   private turfService: TurfService;
@@ -10,15 +11,27 @@ export class TurfController {
     this.turfService = new TurfService();
   }
 
-  // Get all turfs (accessible by users)
+  // Get all turfs (accessible by users, restricted for admins)
   getAllTurfs = async (req: AuthRequest, res: Response) => {
     const { status, city, state } = req.query;
 
-    const filters = {
+    const filters: any = {
       status: status as TurfStatus,
       city: city as string,
       state: state as string,
     };
+
+    // SMART FILTERING: If logged in as ADMIN, restrict to their own turfs
+    if (req.user && req.user.role === AuthRole.ADMIN) {
+      // Use service method that filters by ID
+      const turfs = await this.turfService.getTurfsByOwnerId(req.user.id);
+      
+      return res.json({
+        success: true,
+        count: turfs.length,
+        data: turfs,
+      });
+    }
 
     const turfs = await this.turfService.getAllTurfs(filters);
 
@@ -30,6 +43,11 @@ export class TurfController {
   };
 
   getAllTurfsV2 = async (req: AuthRequest, res: Response) => {
+    // SMART FILTERING: If logged in as ADMIN, restrict to their own turfs
+    if (req.user && req.user.role === AuthRole.ADMIN) {
+       req.query.ownerId = req.user.id;
+    }
+
     const turfs = await this.turfService.getAllTurfsV2(req.query);
 
     res.json({
