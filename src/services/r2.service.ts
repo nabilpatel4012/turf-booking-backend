@@ -1,4 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { AppError } from '../middleware/error.middleware';
+import { ErrorCode, ErrorMessages, ErrorStatusCodes } from '../utils/error-codes';
 
 
 // R2 Configuration
@@ -79,7 +81,7 @@ export class R2Service {
       return `${R2_CONFIG.publicUrl}/${filePath}`;
     } catch (error) {
       console.error("R2 Upload error:", error);
-      throw new Error("Failed to upload image to R2");
+      throw new AppError(ErrorMessages[ErrorCode.SRV_UPLOAD_FAILED], ErrorStatusCodes[ErrorCode.SRV_UPLOAD_FAILED], ErrorCode.SRV_UPLOAD_FAILED);
     }
   }
 
@@ -99,7 +101,7 @@ export class R2Service {
     } catch (error) {
        console.error("R2 Delete error:", error);
        // We might not want to throw here if we want to be soft on delete failures
-       throw new Error("Failed to delete image from R2");
+       throw new AppError(ErrorMessages[ErrorCode.SRV_DELETE_FAILED], ErrorStatusCodes[ErrorCode.SRV_DELETE_FAILED], ErrorCode.SRV_DELETE_FAILED);
     }
   }
 

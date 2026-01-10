@@ -6,6 +6,8 @@ import {
   GetAnnouncementsQueryDto,
   UpdateAnnouncementDto,
 } from "../dtos/announcement.dto";
+import { AppError } from "../middleware/error.middleware";
+import { ErrorCode, ErrorMessages, ErrorStatusCodes } from "../utils/error-codes";
 
 export class AnnouncementService {
   private announcementRepository: Repository<Announcement>;
@@ -50,7 +52,7 @@ export class AnnouncementService {
     });
 
     if (!announcement) {
-      throw new Error("Announcement not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_ANNOUNCEMENT], ErrorStatusCodes[ErrorCode.NOT_ANNOUNCEMENT], ErrorCode.NOT_ANNOUNCEMENT);
     }
     return announcement;
   }
@@ -68,7 +70,7 @@ export class AnnouncementService {
     });
 
     if (!announcement) {
-      throw new Error("Announcement not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_ANNOUNCEMENT], ErrorStatusCodes[ErrorCode.NOT_ANNOUNCEMENT], ErrorCode.NOT_ANNOUNCEMENT);
     }
     return this.announcementRepository.save(announcement);
   }
@@ -77,7 +79,7 @@ export class AnnouncementService {
     const result = await this.announcementRepository.delete(id);
 
     if (result.affected === 0) {
-      throw new Error("Announcement not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_ANNOUNCEMENT], ErrorStatusCodes[ErrorCode.NOT_ANNOUNCEMENT], ErrorCode.NOT_ANNOUNCEMENT);
     }
 
     return { message: "Announcement deleted successfully" };

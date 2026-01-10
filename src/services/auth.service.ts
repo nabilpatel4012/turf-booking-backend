@@ -7,6 +7,8 @@ import { AppDataSource } from "../db/data.source";
 import { SessionService, DeviceInfo } from "./session.service";
 import { Session } from "../entities/session.entity";
 import { OTPService } from "./otp.service";
+import { AppError } from "../middleware/error.middleware";
+import { ErrorCode, ErrorMessages, ErrorStatusCodes } from "../utils/error-codes";
 
 export enum AuthRole {
   USER = "user",
@@ -66,7 +68,7 @@ export class AuthService {
           email,
         };
       }
-      throw new Error("User already exists");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_USER_EXISTS], ErrorStatusCodes[ErrorCode.AUTH_USER_EXISTS], ErrorCode.AUTH_USER_EXISTS);
     }
 
     const hashedPassword = await bcrypt.hash(password, this.bcryptRounds);
@@ -104,24 +106,24 @@ export class AuthService {
       .getOne();
 
     if (!user) {
-      throw new Error("Invalid credentials");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorStatusCodes[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
 
     if (!user.isActive) {
-      throw new Error("Account is deactivated. Please contact support.");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_ACCOUNT_DEACTIVATED], ErrorStatusCodes[ErrorCode.AUTH_ACCOUNT_DEACTIVATED], ErrorCode.AUTH_ACCOUNT_DEACTIVATED);
     }
 
     if (!user.isVerified) {
       // Resend OTP if not verified
       const otpService = new OTPService();
       await otpService.sendOTP(email, user.name);
-      throw new Error("Email not verified. A new verification code has been sent.");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_EMAIL_NOT_VERIFIED], ErrorStatusCodes[ErrorCode.AUTH_EMAIL_NOT_VERIFIED], ErrorCode.AUTH_EMAIL_NOT_VERIFIED);
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
-      throw new Error("Invalid credentials");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorStatusCodes[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
 
     // Create new session
@@ -163,7 +165,7 @@ export class AuthService {
     });
 
     if (existingAdmin) {
-      throw new Error("Admin already exists");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_ADMIN_EXISTS], ErrorStatusCodes[ErrorCode.AUTH_ADMIN_EXISTS], ErrorCode.AUTH_ADMIN_EXISTS);
     }
 
     const hashedPassword = await bcrypt.hash(password, this.bcryptRounds);
@@ -216,17 +218,17 @@ export class AuthService {
       .getOne();
 
     if (!admin) {
-      throw new Error("Invalid credentials");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorStatusCodes[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
 
     if (!admin.isActive) {
-      throw new Error("Account is deactivated. Please contact support.");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_ACCOUNT_DEACTIVATED], ErrorStatusCodes[ErrorCode.AUTH_ACCOUNT_DEACTIVATED], ErrorCode.AUTH_ACCOUNT_DEACTIVATED);
     }
 
     const isValidPassword = await bcrypt.compare(password, admin.password);
 
     if (!isValidPassword) {
-      throw new Error("Invalid credentials");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorStatusCodes[ErrorCode.AUTH_INVALID_CREDENTIALS], ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
 
     // Create new session
@@ -264,11 +266,11 @@ export class AuthService {
     const session = await this.sessionService.findByRefreshToken(refreshToken);
 
     if (!session) {
-      throw new Error("Invalid refresh token");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INVALID_REFRESH_TOKEN], ErrorStatusCodes[ErrorCode.AUTH_INVALID_REFRESH_TOKEN], ErrorCode.AUTH_INVALID_REFRESH_TOKEN);
     }
 
     if (new Date() > session.expiresAt) {
-      throw new Error("Refresh token expired");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_REFRESH_TOKEN_EXPIRED], ErrorStatusCodes[ErrorCode.AUTH_REFRESH_TOKEN_EXPIRED], ErrorCode.AUTH_REFRESH_TOKEN_EXPIRED);
     }
 
     // Update last used time
@@ -283,7 +285,7 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new Error("User not found or inactive");
+        throw new AppError("User not found or inactive", ErrorStatusCodes[ErrorCode.NOT_USER], ErrorCode.NOT_USER);
       }
 
       userData = {
@@ -300,7 +302,7 @@ export class AuthService {
       });
 
       if (!admin) {
-        throw new Error("Admin not found or inactive");
+        throw new AppError("Admin not found or inactive", ErrorStatusCodes[ErrorCode.NOT_ADMIN], ErrorCode.NOT_ADMIN);
       }
 
       userData = {
@@ -312,7 +314,7 @@ export class AuthService {
       };
       role = AuthRole.ADMIN;
     } else {
-      throw new Error("Invalid session");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INVALID_SESSION], ErrorStatusCodes[ErrorCode.AUTH_INVALID_SESSION], ErrorCode.AUTH_INVALID_SESSION);
     }
 
     const accessToken = this.generateAccessToken(userData.id, role, session.id);
@@ -357,13 +359,13 @@ export class AuthService {
       .getOne();
 
     if (!user) {
-      throw new Error("User not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_USER], ErrorStatusCodes[ErrorCode.NOT_USER], ErrorCode.NOT_USER);
     }
 
     const isValidPassword = await bcrypt.compare(oldPassword, user.password);
 
     if (!isValidPassword) {
-      throw new Error("Current password is incorrect");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INCORRECT_PASSWORD], ErrorStatusCodes[ErrorCode.AUTH_INCORRECT_PASSWORD], ErrorCode.AUTH_INCORRECT_PASSWORD);
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, this.bcryptRounds);
@@ -387,13 +389,13 @@ export class AuthService {
       .getOne();
 
     if (!admin) {
-      throw new Error("Admin not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_ADMIN], ErrorStatusCodes[ErrorCode.NOT_ADMIN], ErrorCode.NOT_ADMIN);
     }
 
     const isValidPassword = await bcrypt.compare(oldPassword, admin.password);
 
     if (!isValidPassword) {
-      throw new Error("Current password is incorrect");
+      throw new AppError(ErrorMessages[ErrorCode.AUTH_INCORRECT_PASSWORD], ErrorStatusCodes[ErrorCode.AUTH_INCORRECT_PASSWORD], ErrorCode.AUTH_INCORRECT_PASSWORD);
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, this.bcryptRounds);
@@ -414,7 +416,7 @@ export class AuthService {
     );
 
     if (result.affected === 0) {
-      throw new Error("User not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_USER], ErrorStatusCodes[ErrorCode.NOT_USER], ErrorCode.NOT_USER);
     }
 
     return { message: "Password reset successfully" };
@@ -430,7 +432,7 @@ export class AuthService {
     );
 
     if (result.affected === 0) {
-      throw new Error("Admin not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_ADMIN], ErrorStatusCodes[ErrorCode.NOT_ADMIN], ErrorCode.NOT_ADMIN);
     }
 
     return { message: "Password reset successfully" };

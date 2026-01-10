@@ -3,6 +3,8 @@ import { Review } from "../entities/review.entity";
 import { ReviewReport } from "../entities/review-report.entity";
 import { Booking, BookingStatus } from "../entities/booking.entity";
 import { AppDataSource } from "../db/data.source";
+import { AppError } from "../middleware/error.middleware";
+import { ErrorCode, ErrorMessages, ErrorStatusCodes } from "../utils/error-codes";
 
 export class ReviewService {
   private reviewRepository: Repository<Review>;
@@ -23,7 +25,7 @@ export class ReviewService {
   ) {
     // Validate rating
     if (rating < 1 || rating > 5) {
-      throw new Error("Rating must be between 1 and 5");
+      throw new AppError(ErrorMessages[ErrorCode.VAL_INVALID_RATING], ErrorStatusCodes[ErrorCode.VAL_INVALID_RATING], ErrorCode.VAL_INVALID_RATING);
     }
 
     // Verify booking exists and belongs to user
@@ -33,25 +35,23 @@ export class ReviewService {
     });
 
     if (!booking) {
-      throw new Error("Booking not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_BOOKING], ErrorStatusCodes[ErrorCode.NOT_BOOKING], ErrorCode.NOT_BOOKING);
     }
 
     if (booking.userId !== userId) {
-      throw new Error("You can only review your own bookings");
+      throw new AppError("You can only review your own bookings", 403, ErrorCode.AUTH_UNAUTHORIZED);
     }
 
     // Check if booking is completed (past end time)
     if (booking.endTime > new Date()) {
-      throw new Error(
-        "Cannot review a booking that has not been completed yet"
-      );
+      throw new AppError("Cannot review a booking that has not been completed yet", 400);
     }
 
     if (
       booking.status !== BookingStatus.ACTIVE &&
       booking.status !== BookingStatus.COMPLETED
     ) {
-      throw new Error("Cannot review a cancelled booking");
+      throw new AppError("Cannot review a cancelled booking", 400);
     }
 
     // Check if review already exists
@@ -60,7 +60,7 @@ export class ReviewService {
     });
 
     if (existingReview) {
-      throw new Error("You have already reviewed this booking");
+      throw new AppError(ErrorMessages[ErrorCode.CON_ALREADY_REVIEWED], ErrorStatusCodes[ErrorCode.CON_ALREADY_REVIEWED], ErrorCode.CON_ALREADY_REVIEWED);
     }
 
     const review = this.reviewRepository.create({
@@ -145,15 +145,15 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new Error("Review not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_REVIEW], ErrorStatusCodes[ErrorCode.NOT_REVIEW], ErrorCode.NOT_REVIEW);
     }
 
     if (review.userId !== userId) {
-      throw new Error("You can only update your own reviews");
+      throw new AppError("You can only update your own reviews", 403, ErrorCode.AUTH_UNAUTHORIZED);
     }
 
     if (rating < 1 || rating > 5) {
-      throw new Error("Rating must be between 1 and 5");
+      throw new AppError(ErrorMessages[ErrorCode.VAL_INVALID_RATING], ErrorStatusCodes[ErrorCode.VAL_INVALID_RATING], ErrorCode.VAL_INVALID_RATING);
     }
 
     review.rating = rating;
@@ -168,11 +168,11 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new Error("Review not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_REVIEW], ErrorStatusCodes[ErrorCode.NOT_REVIEW], ErrorCode.NOT_REVIEW);
     }
 
     if (!isAdmin && review.userId !== userId) {
-      throw new Error("You can only delete your own reviews");
+      throw new AppError("You can only delete your own reviews", 403, ErrorCode.AUTH_UNAUTHORIZED);
     }
 
     return await this.reviewRepository.remove(review);
@@ -184,7 +184,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new Error("Review not found");
+      throw new AppError(ErrorMessages[ErrorCode.NOT_REVIEW], ErrorStatusCodes[ErrorCode.NOT_REVIEW], ErrorCode.NOT_REVIEW);
     }
     
     const existingReport = await this.reportRepository.findOne({
@@ -192,7 +192,7 @@ export class ReviewService {
     });
     
     if (existingReport) {
-        throw new Error("You have already reported this review");
+        throw new AppError(ErrorMessages[ErrorCode.CON_ALREADY_REPORTED], ErrorStatusCodes[ErrorCode.CON_ALREADY_REPORTED], ErrorCode.CON_ALREADY_REPORTED);
     }
 
     const report = this.reportRepository.create({

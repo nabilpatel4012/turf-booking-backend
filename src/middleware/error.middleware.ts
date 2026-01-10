@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 
 export class AppError extends Error {
-  constructor(public message: string, public statusCode: number = 500) {
+  constructor(
+    public message: string,
+    public statusCode: number = 500,
+    public code?: string
+  ) {
     super(message);
     this.name = "AppError";
   }
@@ -16,10 +20,14 @@ export const errorHandler = (
   console.error("Error:", err);
 
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({ error: err.message });
+    const response: { error: string; code?: string } = { error: err.message };
+    if (err.code) {
+      response.code = err.code;
+    }
+    return res.status(err.statusCode).json(response);
   }
 
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({ error: "Internal server error", code: "SRV_005" });
 };
 
 export const asyncHandler = (fn: Function) => {
@@ -27,3 +35,4 @@ export const asyncHandler = (fn: Function) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
+

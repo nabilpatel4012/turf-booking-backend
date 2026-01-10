@@ -32,7 +32,7 @@ export class BookingController {
       // If Admin is booking, ensure they have a User account (Shadow User)
       const admin = await this.adminRepository.findOne({ where: { id: userId } });
       if (!admin) {
-        throw new Error("Admin not found");
+        throw new AppError("Admin not found", 404, "NOT_002");
       }
 
       let user = await this.userRepository.findOne({ where: { email: admin.email } });
