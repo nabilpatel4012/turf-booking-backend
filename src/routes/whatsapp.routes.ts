@@ -1,12 +1,12 @@
 import { Router, Request, Response } from "express";
 import { getWhatsAppService } from "../services/whatsapp.service";
-import { authenticate, isAdmin, AuthRequest } from "../middleware/auth.middleware";
+import { authenticateAdmin, AuthRequest } from "../middleware/auth.middleware";
 import QRCode from "qrcode";
 
 const router = Router();
 
-// All WhatsApp admin routes require authentication and admin role
-router.use(authenticate, isAdmin);
+// All WhatsApp admin routes require admin authentication (only checks aAccessToken)
+router.use(authenticateAdmin);
 
 /**
  * GET /api/whatsapp/status

@@ -3,7 +3,7 @@ import { PricingController } from "../controllers/pricing.controller";
 import { AnnouncementController } from "../controllers/announcement.controller";
 import { SettingController } from "../controllers/setting.controller";
 import { StatsController } from "../controllers/stats.controller";
-import { authenticate, isAdmin } from "../middleware/auth.middleware";
+import { authenticateAdmin } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/error.middleware";
 import { validateAnnouncement } from "../middleware/validation.middleware";
 
@@ -13,8 +13,8 @@ const announcementController = new AnnouncementController();
 const settingController = new SettingController();
 const statsController = new StatsController();
 
-// All admin routes require authentication and admin role
-router.use(authenticate, isAdmin);
+// All admin routes require admin authentication (only checks aAccessToken)
+router.use(authenticateAdmin);
 
 // Pricing
 router.put("/pricing", asyncHandler(pricingController.updatePricing));
