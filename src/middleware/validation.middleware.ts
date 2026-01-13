@@ -94,12 +94,23 @@ export const validateBooking = (
     );
   }
 
-  // Check that both times fall on the given date
+  // Check that start time falls on the given date
   const startDate = start.toISOString().split("T")[0];
+  if (startDate !== date) {
+    throw new AppError("startTime must match the provided date", 400);
+  }
+
+  // Check that end time falls on the given date OR the next day
   const endDate = end.toISOString().split("T")[0];
-  if (startDate !== date || endDate !== date) {
+  
+  // Calculate next day string
+  const dateObj = new Date(date);
+  dateObj.setDate(dateObj.getDate() + 1);
+  const nextDate = dateObj.toISOString().split("T")[0];
+
+  if (endDate !== date && endDate !== nextDate) {
     throw new AppError(
-      "startTime and endTime must match the provided date",
+      "endTime must be on the same date or the next day",
       400
     );
   }
