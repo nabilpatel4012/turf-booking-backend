@@ -194,6 +194,15 @@ export class AuthController {
     });
   };
 
+  // Smart Refresh Token - detects if user or admin based on cookies
+  generalRefreshToken = async (req: AuthRequest, res: Response) => {
+    
+    if (req.cookies.aRefreshToken) {
+      return this.refreshAdminToken(req, res);
+    }
+    return this.refreshUserToken(req, res);
+  };
+
   // Logout (revoke current session)
   logout = async (req: AuthRequest, res: Response) => {
     const sessionId = req.user?.sessionId;
