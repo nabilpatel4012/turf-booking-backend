@@ -1,6 +1,7 @@
 import { Client, LocalAuth, Message } from "whatsapp-web.js";
 
 // Types for WhatsApp messages
+// Updated interface to include admin notification data
 export interface BookingWhatsAppData {
   phone: string;
   userName: string;
@@ -312,6 +313,27 @@ export class WhatsAppService {
     return message;
   }
 
+  private generateAdminBookingMessage(data: AdminBookingWhatsAppData): string {
+    let message = `🆕 *New Booking Alert*\n\n`;
+    message += `You have received a new booking for *${data.turfName}*.\n\n`;
+    
+    message += `👤 *Customer Details:*\n`;
+    message += `Name: ${data.userName}\n`;
+    message += `Phone: ${data.userPhone}\n\n`;
+    
+    message += `📅 *Booking Details:*\n`;
+    message += `Date: ${data.bookingDate}\n`;
+    message += `Time: ${data.startTime} - ${data.endTime}\n\n`;
+    
+    message += `💰 *Payment Status:*\n`;
+    message += `Paid: ₹${data.paidAmount}\n`;
+    message += `Pending: ₹${data.pendingAmount}\n\n`;
+    
+    message += `_This is an automated notification from NexSports._`;
+    
+    return message;
+  }
+
   private generateBookingCancellationMessage(data: CancellationWhatsAppData): string {
     let message = `❌ *Booking Cancelled*\n\n`;
     message += `Hi ${data.userName},\n\n`;
@@ -380,27 +402,6 @@ export class WhatsAppService {
     }
     
     message += `\n_Thank you for using NexSports!_`;
-    
-    return message;
-  }
-
-  private generateAdminBookingMessage(data: AdminBookingWhatsAppData): string {
-    let message = `🆕 *New Booking Alert*\n\n`;
-    message += `You have received a new booking for *${data.turfName}*.\n\n`;
-    
-    message += `👤 *Customer Details:*\n`;
-    message += `Name: ${data.userName}\n`;
-    message += `Phone: ${data.userPhone}\n\n`;
-    
-    message += `📅 *Booking Details:*\n`;
-    message += `Date: ${data.bookingDate}\n`;
-    message += `Time: ${data.startTime} - ${data.endTime}\n\n`;
-    
-    message += `💰 *Payment Status:*\n`;
-    message += `Paid: ₹${data.paidAmount}\n`;
-    message += `Pending: ₹${data.pendingAmount}\n\n`;
-    
-    message += `_This is an automated notification from NexSports._`;
     
     return message;
   }
