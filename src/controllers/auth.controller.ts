@@ -35,6 +35,10 @@ export class AuthController {
   private clearUserCookies(res: Response) {
     res.clearCookie("uAccessToken", { path: '/' });
     res.clearCookie("uRefreshToken", { path: '/' });
+
+    // For backwards compatibility, also clear old cookies
+    res.clearCookie("accessToken", { path: '/' });
+    res.clearCookie("refreshToken", { path: '/' });
   }
 
   // --- ADMIN COOKIE HELPERS ---
@@ -49,6 +53,9 @@ export class AuthController {
   private clearAdminCookies(res: Response) {
     res.clearCookie("aAccessToken", { path: '/' });
     res.clearCookie("aRefreshToken", { path: '/' });
+    // For backwards compatibility, also clear old cookies
+    res.clearCookie("accessToken", { path: '/' });
+    res.clearCookie("refreshToken", { path: '/' });
   }
 
   // Legacy helper for backward compatibility - clears based on role

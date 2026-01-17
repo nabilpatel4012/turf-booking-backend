@@ -285,6 +285,10 @@ export class BookingService {
          } catch (e) {
              console.error("Failed to send user confirmation whatsapp", e);
          }
+         
+         // Send Admin Notification immediately if confirmed (e.g. auto-confirm without payment)
+         this.sendAdminNotifications(booking).catch(e => console.error("Failed to send admin notification:", e));
+
     } else if (!result.razorpayOrder) {
         // Send Admin Notification for new pending request (if not waiting for payment)
         try {
@@ -418,6 +422,11 @@ export class BookingService {
       this.sendBookingConfirmationWhatsApp(savedBooking).catch((e: unknown) => 
         console.error("Failed to send booking confirmation WhatsApp:", e)
       );
+      
+      // Send Admin Notification
+      this.sendAdminNotifications(savedBooking).catch((e: unknown) => 
+        console.error("Failed to send admin notification:", e)
+      );
 
       return savedBooking;
   }
@@ -447,7 +456,18 @@ export class BookingService {
       booking.status = BookingStatus.CONFIRMED;
       booking.paymentId = paymentId;
       booking.lockedUntil = null as any; // Clear lock
-      return await this.bookingRepository.save(booking);
+      booking.lockedUntil = null as any; // Clear lock
+      const savedBooking = await this.bookingRepository.save(booking);
+      
+      this.sendBookingConfirmationEmail(savedBooking).catch((e: unknown) => console.error(e));
+      this.sendBookingConfirmationWhatsApp(savedBooking).catch((e: unknown) => console.error(e));
+      
+      // Send Admin Notification
+      this.sendAdminNotifications(savedBooking).catch((e: unknown) => 
+        console.error("Failed to send admin notification:", e)
+      );
+
+      return savedBooking;
     }
 
     return booking;
@@ -1293,6 +1313,68 @@ export class BookingService {
    * Helper to format time for emails
    * Note: The DB stores times in IST already, so we just format without timezone conversion
    */
+  /**
+   * Helper to send admin notifications (Email + WhatsApp)
+   */
+  private async sendAdminNotifications(booking: Booking): Promise<void> {
+    try {
+      // 1. Fetch details
+      const turf = await this.turfRepository.findOne({ where: { id: booking.turfId } });
+      const user = await this.userRepository.findOne({ where: { id: booking.userId } });
+      
+      if (!turf || !user) {
+         console.warn("Cannot send admin notification: turf or user not found");
+         return;
+      }
+
+      const admin = await this.adminRepository.findOne({ where: { id: turf.ownerId } });
+      if (!admin) {
+         console.warn("Cannot send admin notification: owner admin not found");
+         return;
+      }
+
+      // 2. Prepare Data
+      const paidAmount = booking.paidAmount ? Number(booking.paidAmount) : 0;
+      const totalAmount = Number(booking.totalAmount);
+      const pendingAmount = totalAmount - paidAmount;
+      const userPhone = user.phone || "N/A";
+
+      // 3. Send Email
+      if (admin.email) {
+          await this.emailService.sendAdminBookingNotification({
+              userName: user.name,
+              userPhone: userPhone,
+              turfName: turf.name,
+              bookingDate: booking.date,
+              startTime: this.formatTime(booking.startTime),
+              endTime: this.formatTime(booking.endTime),
+              paidAmount,
+              pendingAmount,
+              bookingId: booking.id,
+              adminEmail: admin.email
+          });
+      }
+
+      // 4. Send WhatsApp
+      if (admin.phone) {
+          await this.whatsAppService.sendAdminBookingNotification({
+              phone: admin.phone, // Admin's phone
+              userPhone: userPhone,
+              userName: user.name,
+              turfName: turf.name,
+              bookingDate: booking.date,
+              startTime: this.formatTime(booking.startTime),
+              endTime: this.formatTime(booking.endTime),
+              paidAmount,
+              pendingAmount,
+          });
+      }
+
+    } catch (error) {
+       console.error("Error in sendAdminNotifications:", error);
+    }
+  }
+
   private formatTime(date: Date): string {
     return format(date, "hh:mm a");
   }

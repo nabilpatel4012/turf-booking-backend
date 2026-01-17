@@ -15,6 +15,18 @@ export interface BookingWhatsAppData {
   orderId?: string;
 }
 
+export interface AdminBookingWhatsAppData {
+  phone: string; // Admin's phone (Recipient)
+  userPhone: string; // Customer's phone
+  userName: string;
+  turfName: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  paidAmount: number;
+  pendingAmount: number;
+}
+
 export interface CancellationWhatsAppData extends BookingWhatsAppData {
   cancellationReason?: string;
   cancelledBy: "user" | "admin";
@@ -184,6 +196,28 @@ export class WhatsAppService {
   }
 
   /**
+   * Send admin booking notification message
+   */
+  async sendAdminBookingNotification(data: AdminBookingWhatsAppData): Promise<boolean> {
+    if (!this.isServiceReady()) {
+      console.warn("WhatsApp service not ready. Skipping admin booking notification.");
+      return false;
+    }
+
+    try {
+      const chatId = this.formatPhoneNumber(data.phone);
+      const message = this.generateAdminBookingMessage(data);
+      
+      await this.client.sendMessage(chatId, message);
+      console.log(`WhatsApp admin notification sent to ${data.phone}`);
+      return true;
+    } catch (error) {
+      console.error("Failed to send WhatsApp admin notification:", error);
+      return false;
+    }
+  }
+
+  /**
    * Send booking cancellation message
    */
   async sendBookingCancellation(data: CancellationWhatsAppData): Promise<boolean> {
@@ -346,6 +380,27 @@ export class WhatsAppService {
     }
     
     message += `\n_Thank you for using NexSports!_`;
+    
+    return message;
+  }
+
+  private generateAdminBookingMessage(data: AdminBookingWhatsAppData): string {
+    let message = `🆕 *New Booking Alert*\n\n`;
+    message += `You have received a new booking for *${data.turfName}*.\n\n`;
+    
+    message += `👤 *Customer Details:*\n`;
+    message += `Name: ${data.userName}\n`;
+    message += `Phone: ${data.userPhone}\n\n`;
+    
+    message += `📅 *Booking Details:*\n`;
+    message += `Date: ${data.bookingDate}\n`;
+    message += `Time: ${data.startTime} - ${data.endTime}\n\n`;
+    
+    message += `💰 *Payment Status:*\n`;
+    message += `Paid: ₹${data.paidAmount}\n`;
+    message += `Pending: ₹${data.pendingAmount}\n\n`;
+    
+    message += `_This is an automated notification from NexSports._`;
     
     return message;
   }

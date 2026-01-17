@@ -8,6 +8,21 @@ import {
 import * as React from "react";
 
 // Types
+import { AdminBookingNotification } from "../emails/AdminBookingNotification";
+
+export interface AdminBookingEmailData {
+  userName: string;
+  userPhone: string;
+  turfName: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  paidAmount: number;
+  pendingAmount: number;
+  bookingId: string;
+  adminEmail: string;
+}
+
 export interface BookingEmailData {
   userName: string;
   userEmail: string;
@@ -135,6 +150,40 @@ export class EmailService {
       return true;
     } catch (error) {
       console.error("Failed to send booking cancellation email:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Send admin booking notification email
+   */
+  async sendAdminBookingNotification(data: AdminBookingEmailData): Promise<boolean> {
+    try {
+      const html = await render(
+        React.createElement(AdminBookingNotification, {
+          userName: data.userName,
+          userPhone: data.userPhone,
+          turfName: data.turfName,
+          bookingDate: data.bookingDate,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          paidAmount: data.paidAmount,
+          pendingAmount: data.pendingAmount,
+          bookingId: data.bookingId,
+        })
+      );
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: data.adminEmail,
+        subject: `New Booking: ${data.turfName}`,
+        html,
+      });
+
+      console.log(`Admin booking notification sent to ${data.adminEmail}`);
+      return true;
+    } catch (error) {
+      console.error("Failed to send admin booking notification:", error);
       return false;
     }
   }

@@ -59,7 +59,7 @@ export class OTPController {
         cookieDomain = 'app.nexsports.in';
       }
       
-      res.cookie("accessToken", accessToken, {
+      res.cookie("uAccessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
@@ -68,7 +68,7 @@ export class OTPController {
       });
 
       // Also set refresh token cookie
-      res.cookie("refreshToken", session.refreshToken, {
+      res.cookie("uRefreshToken", session.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
