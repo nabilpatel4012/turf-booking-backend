@@ -40,7 +40,7 @@
     "speakeasy": "^2.0.0",
     "typeorm": "^0.3.17",
     "ua-parser-js": "^2.0.5",
-    "whatsapp-web.js": "^1.34.4",
+    "whatsapp-web.js": "^1.34.5-alpha.3",
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
